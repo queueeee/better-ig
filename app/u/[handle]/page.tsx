@@ -11,6 +11,8 @@ import {
 } from "@/lib/post";
 import { SetupHinweis } from "@/app/setup-hinweis";
 import { FolgenKnopf } from "./folgen-knopf";
+import { SchreibenKnopf } from "./schreiben-knopf";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function ProfilePage({
   params,
@@ -31,6 +33,15 @@ export default async function ProfilePage({
   if (profile.isMe) redirect("/profil");
 
   const posts = await getOwnPosts(profile.id);
+
+  // Ohne öffentlichen Schlüssel kann das Gegenüber keine Nachrichten
+  // empfangen — dann ist der Knopf irreführend.
+  const supabase = await createClient();
+  const { data: fremdeKeys } = await supabase
+    .from("user_keys")
+    .select("user_id")
+    .eq("user_id", profile.id)
+    .maybeSingle();
 
   return (
     <main className="mx-auto w-full max-w-xl flex-1 px-6 py-10">
@@ -59,10 +70,14 @@ export default async function ProfilePage({
             {postLabel(profile.postCount)} · {followerLabel(profile.followerCount)}
           </p>
         </div>
-        <div className="shrink-0 pt-2">
+        <div className="flex shrink-0 flex-col items-end gap-2 pt-2">
           <FolgenKnopf
             targetId={profile.id}
             following={profile.followedByMe}
+          />
+          <SchreibenKnopf
+            targetId={profile.id}
+            targetHasKeys={Boolean(fremdeKeys)}
           />
         </div>
       </div>

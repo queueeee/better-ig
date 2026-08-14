@@ -26,6 +26,12 @@ export function Kopfzeile({ handle, active }: Props) {
             Bild hochladen
           </Link>
           <Link
+            href="/nachrichten"
+            className="text-muted underline decoration-line underline-offset-4 transition-colors hover:text-ink"
+          >
+            Nachrichten
+          </Link>
+          <Link
             href="/profil"
             className="text-muted underline decoration-line underline-offset-4 transition-colors hover:text-ink"
           >

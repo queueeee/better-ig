@@ -132,6 +132,9 @@ try {
       ["comments", "0003_likes_kommentare.sql"],
       ["follows", "0004_folgen.sql"],
       ["stories", "0006_stories.sql"],
+      ["conversations", "0007_unterhaltungen.sql"],
+      ["user_keys", "0008_schluessel.sql"],
+      ["messages", "0009_nachrichten.sql"],
     ];
 
     // Migration 0005 legt keine Tabelle an, sondern Spalten — erkennbar
