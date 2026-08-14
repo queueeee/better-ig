@@ -1,11 +1,16 @@
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { getOwnProfile } from "@/lib/profile";
+import { SetupHinweis } from "@/app/setup-hinweis";
 import { Passkeys } from "./passkeys";
 
 export default async function HomePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const result = await getOwnProfile();
+
+  if (result.status === "no-session") redirect("/login");
+  if (result.status === "table-missing") return <SetupHinweis />;
+  if (!result.profile) redirect("/willkommen");
+
+  const { profile, email } = result;
 
   return (
     <main className="mx-auto w-full max-w-xl flex-1 px-6 py-16">
@@ -24,11 +29,13 @@ export default async function HomePage() {
       </header>
 
       <h1 className="mt-10 font-display text-[2.2rem] leading-[1.1] font-semibold tracking-tight">
-        Du bist drin.
+        {profile.display_name ?? `@${profile.handle}`}
       </h1>
-      <p className="mt-3 text-[0.95rem] leading-relaxed text-muted">
-        Angemeldet als <span className="text-ink">{user?.email}</span>. Mehr
-        wissen wir über dich nicht.
+      <p className="mt-2 text-[0.95rem] text-muted">
+        @{profile.handle}
+        {email ? (
+          <span className="text-muted/70"> · {email}</span>
+        ) : null}
       </p>
 
       <Passkeys />
@@ -38,8 +45,7 @@ export default async function HomePage() {
           Als Nächstes
         </h2>
         <p className="mt-2 text-[0.9rem] leading-relaxed text-muted">
-          Profil mit Nutzernamen, Bilder hochladen, Feed. Die Anmeldung steht
-          und trägt den Rest.
+          Bilder hochladen und der Feed. Profil und Anmeldung stehen.
         </p>
       </section>
     </main>

@@ -106,6 +106,25 @@ try {
       hint("Im Dashboard prüfen: Authentication → Passkeys");
     }
 
+    // Existiert die profiles-Tabelle? PostgREST antwortet auf eine Anfrage
+    // gegen eine unbekannte Tabelle mit 404, auf eine bekannte mit 200 —
+    // Row Level Security liefert dann nur eine leere Liste, was hier genügt.
+    const table = await fetch(`${base}/rest/v1/profiles?select=id&limit=1`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+
+    if (table.status === 404) {
+      fail("Die Tabelle „profiles\" fehlt");
+      hint("Dashboard → SQL Editor → Inhalt von");
+      hint("supabase/migrations/0001_profiles.sql einfügen und Run klicken.");
+    } else if (table.ok || table.status === 401 || table.status === 403) {
+      ok("Tabelle „profiles\" vorhanden");
+    } else {
+      console.log(
+        `  \x1b[33m?\x1b[0m Tabelle „profiles\" — unerwartete Antwort HTTP ${table.status}`,
+      );
+    }
+
     if (settings.mailer_autoconfirm === false) {
       hint(
         "Hinweis: Neue Nutzer müssen ihre E-Mail bestätigen. Deren erste Mail",
