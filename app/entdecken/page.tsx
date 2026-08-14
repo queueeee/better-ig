@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getOwnProfile } from "@/lib/profile";
-import { getFeed } from "@/lib/feed";
+import { FEED_PAGE_SIZE, getFeed } from "@/lib/feed";
 import { SetupHinweis } from "@/app/setup-hinweis";
 import { Kopfzeile } from "@/app/kopfzeile";
 import { FeedListe } from "@/app/feed-liste";
@@ -36,7 +36,11 @@ export default async function EntdeckenPage() {
           </Link>
         </section>
       ) : (
-        <FeedListe posts={posts} />
+        <FeedListe
+          initial={posts}
+          scope="entdecken"
+          hasMore={posts.length === FEED_PAGE_SIZE}
+        />
       )}
     </div>
   );

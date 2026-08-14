@@ -86,9 +86,12 @@ export async function getFollowingIds(userId: string): Promise<string[]> {
  * Supabase empfiehlt dieses Muster ausdrücklich, weil Joins in Kombination
  * mit Zugriffsregeln um Grössenordnungen langsamer werden können.
  */
+export type FeedCursor = { createdAt: string; id: string };
+
 export async function getFeed(
   limit = FEED_PAGE_SIZE,
   authorIds?: string[],
+  cursor?: FeedCursor,
 ): Promise<FeedPost[]> {
   const supabase = await createClient();
 
@@ -96,11 +99,23 @@ export async function getFeed(
     .from("posts")
     .select(POST_FIELDS)
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(limit);
 
   if (authorIds) {
     if (authorIds.length === 0) return [];
     query = query.in("author_id", authorIds);
+  }
+
+  // Keyset statt Offset: Weiter geht es ab dem zuletzt gesehenen Beitrag.
+  // Ein Offset würde Einträge überspringen oder doppeln, sobald während
+  // des Blätterns etwas Neues dazukommt — und wird mit jeder Seite langsamer.
+  // Die id dient als Tiebreaker für den unwahrscheinlichen Fall, dass zwei
+  // Beiträge exakt denselben Zeitstempel tragen.
+  if (cursor) {
+    query = query.or(
+      `created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`,
+    );
   }
 
   const { data, error } = await query;
@@ -113,6 +128,76 @@ export async function getFeed(
   const raw = (data ?? []) as unknown as RawPost[];
   const liked = await likedPostIds(raw.map((post) => post.id));
   return raw.map((post) => shape(post, liked));
+}
+
+export type ProfileHit = {
+  id: string;
+  handle: string;
+  display_name: string | null;
+  postCount: number;
+  followedByMe: boolean;
+};
+
+/**
+ * Sucht Profile nach Name. Ohne Suchbegriff kommen die zuletzt
+ * hinzugekommenen — sonst stünde man auf einer leeren Seite und müsste
+ * raten, wonach man suchen soll.
+ */
+export async function searchProfiles(
+  query: string,
+  viewerId: string,
+  limit = 20,
+): Promise<ProfileHit[]> {
+  const supabase = await createClient();
+
+  let request = supabase
+    .from("profiles")
+    .select("id, handle, display_name, posts:posts!posts_author_id_fkey(count)")
+    .neq("id", viewerId)
+    .limit(limit);
+
+  const term = query.trim();
+  if (term) {
+    // Sonderzeichen von ilike entschärfen, sonst wird aus einer Eingabe
+    // mit % oder _ ein Muster, das alles trifft.
+    const safe = term.replace(/[%_\\]/g, (match) => `\\${match}`);
+    request = request
+      .or(`handle.ilike.%${safe}%,display_name.ilike.%${safe}%`)
+      .order("handle", { ascending: true });
+  } else {
+    request = request.order("created_at", { ascending: false });
+  }
+
+  const { data, error } = await request;
+  if (error) {
+    if (isMissingTable(error.code)) return [];
+    throw new Error(`Suche fehlgeschlagen: ${error.message}`);
+  }
+
+  const rows = (data ?? []) as unknown as {
+    id: string;
+    handle: string;
+    display_name: string | null;
+    posts: unknown;
+  }[];
+
+  const { data: follows } = await supabase
+    .from("follows")
+    .select("following_id")
+    .eq("follower_id", viewerId)
+    .in("following_id", rows.map((row) => row.id));
+
+  const followed = new Set(
+    (follows ?? []).map((row) => row.following_id as string),
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    handle: row.handle,
+    display_name: row.display_name,
+    postCount: readCount(row.posts),
+    followedByMe: followed.has(row.id),
+  }));
 }
 
 /** Öffentliches Profil samt Zählern und eigenem Folge-Status. */

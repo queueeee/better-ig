@@ -3,7 +3,7 @@ import Link from "next/link";
 type Props = {
   handle: string;
   /** Welcher Reiter ist aktiv? */
-  active: "feed" | "entdecken";
+  active: "feed" | "entdecken" | "suche";
 };
 
 export function Kopfzeile({ handle, active }: Props) {
@@ -40,6 +40,9 @@ export function Kopfzeile({ handle, active }: Props) {
         </Link>
         <Link href="/entdecken" className={tab(active === "entdecken")}>
           Entdecken
+        </Link>
+        <Link href="/suche" className={tab(active === "suche")}>
+          Leute finden
         </Link>
       </nav>
     </header>

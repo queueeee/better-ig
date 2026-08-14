@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { FEED_PAGE_SIZE, getFeed, getFollowingIds } from "@/lib/feed";
+import type { FeedPost } from "@/lib/post";
 
 export type ActionResult = { ok: true } | { ok: false; message: string };
 
@@ -131,4 +133,33 @@ export async function setFollow(
   revalidatePath("/");
   revalidatePath("/entdecken");
   return { ok: true };
+}
+
+/**
+ * Lädt die nächste Seite des Feeds. `scope` entscheidet, ob nur Gefolgte
+ * oder alles gezeigt wird — der Client darf das nicht frei bestimmen,
+ * sonst könnte er sich die Einschränkung selbst wegkonfigurieren.
+ */
+export async function loadMorePosts(
+  scope: "feed" | "entdecken",
+  cursor: { createdAt: string; id: string },
+): Promise<{ posts: FeedPost[] } | { error: string }> {
+  const session = await requireUser();
+  if (!session) return { error: "Nicht angemeldet." };
+
+  try {
+    if (scope === "entdecken") {
+      return { posts: await getFeed(FEED_PAGE_SIZE, undefined, cursor) };
+    }
+    const following = await getFollowingIds(session.userId);
+    return {
+      posts: await getFeed(
+        FEED_PAGE_SIZE,
+        [...following, session.userId],
+        cursor,
+      ),
+    };
+  } catch {
+    return { error: "Es ließ sich nichts nachladen." };
+  }
 }
