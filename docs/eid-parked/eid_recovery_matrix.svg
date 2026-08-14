@@ -1,0 +1,61 @@
+<svg width="100%" viewBox="0 0 720 545" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+<title>Recovery-Matrix: Ausweiswechsel und Verlust</title>
+<desc>Vier Szenarien je nachdem, ob Account-Zugang und Ausweisdokument noch vorhanden sind: Karten-Rotation, kein Handlungsbedarf, Reclaim, Neu-Registrierung. Der Account-Zugang läuft nie über die Karte.</desc>
+
+<text x="30" y="38" font-size="15" font-weight="600" fill="#3C3B38">Recovery-Matrix: Ausweiswechsel &amp; Verlust</text>
+<text x="30" y="58" font-size="12" fill="#6B6963">Was zu tun ist, je nachdem was noch vorhanden ist — der Account-Zugang läuft nie über die Karte</text>
+
+<!-- Kopfzeile -->
+<rect x="30" y="78" width="150" height="36" fill="#F1EFE8" stroke="#B9B7AE" stroke-width="0.75"/>
+<rect x="180" y="78" width="255" height="36" fill="#F1EFE8" stroke="#B9B7AE" stroke-width="0.75"/>
+<rect x="435" y="78" width="255" height="36" fill="#F1EFE8" stroke="#B9B7AE" stroke-width="0.75"/>
+<text x="307" y="101" text-anchor="middle" font-size="12.5" font-weight="600" fill="#55534E">Account-Zugang vorhanden*</text>
+<text x="562" y="101" text-anchor="middle" font-size="12.5" font-weight="600" fill="#55534E">Account-Zugang verloren</text>
+
+<!-- Zeilenkoepfe -->
+<rect x="30" y="114" width="150" height="180" fill="#F1EFE8" stroke="#B9B7AE" stroke-width="0.75"/>
+<text x="105" y="195" text-anchor="middle" font-size="12.5" font-weight="600" fill="#55534E">Dokument da</text>
+<text x="105" y="213" text-anchor="middle" font-size="11" fill="#6B6963">(gleiche o. neue Karte)</text>
+<rect x="30" y="294" width="150" height="180" fill="#F1EFE8" stroke="#B9B7AE" stroke-width="0.75"/>
+<text x="105" y="375" text-anchor="middle" font-size="12.5" font-weight="600" fill="#55534E">Dokument weg</text>
+<text x="105" y="393" text-anchor="middle" font-size="11" fill="#6B6963">oder Chip defekt</text>
+
+<!-- Zelle: Zugang ja / Dokument da -->
+<rect x="180" y="114" width="255" height="180" fill="#E7F4EE" stroke="#14805E" stroke-width="0.75"/>
+<text x="307" y="144" text-anchor="middle" font-size="13" font-weight="600" fill="#0B5C44">Karten-Rotation</text>
+<text x="307" y="168" text-anchor="middle" font-size="12" fill="#3C3B38">Bei Kartenwechsel: eingeloggt das</text>
+<text x="307" y="186" text-anchor="middle" font-size="12" fill="#3C3B38">neue Pseudonym beweisen —</text>
+<text x="307" y="204" text-anchor="middle" font-size="12" fill="#3C3B38">Registry trägt P_neu nach.</text>
+<text x="307" y="222" text-anchor="middle" font-size="12" fill="#3C3B38">Kein Eingriff am Account.</text>
+<text x="307" y="240" text-anchor="middle" font-size="12" fill="#6B6963">Am besten direkt nach Abholung.</text>
+
+<!-- Zelle: Zugang verloren / Dokument da -->
+<rect x="435" y="114" width="255" height="180" fill="#EAF2FA" stroke="#2F6FA8" stroke-width="0.75"/>
+<text x="562" y="144" text-anchor="middle" font-size="13" font-weight="600" fill="#1F4E78">Reclaim (letzter Ausweg)</text>
+<text x="562" y="168" text-anchor="middle" font-size="12" fill="#3C3B38">Erst reguläre Wiederherstellung</text>
+<text x="562" y="186" text-anchor="middle" font-size="12" fill="#3C3B38">über Codes / E-Mail-Faktor.</text>
+<text x="562" y="204" text-anchor="middle" font-size="12" fill="#3C3B38">Sonst: Chip-Beweis → einmalige</text>
+<text x="562" y="222" text-anchor="middle" font-size="12" fill="#3C3B38">Neu-Registrierung mit Cooldown.</text>
+<text x="562" y="240" text-anchor="middle" font-size="12" fill="#6B6963">Slot kommt zurück — Daten nicht.</text>
+
+<!-- Zelle: Zugang vorhanden / Dokument weg -->
+<rect x="180" y="294" width="255" height="180" fill="#FDF4E7" stroke="#B4772F" stroke-width="0.75"/>
+<text x="307" y="324" text-anchor="middle" font-size="13" font-weight="600" fill="#8A5A1B">Kein Handlungsbedarf</text>
+<text x="307" y="348" text-anchor="middle" font-size="12" fill="#3C3B38">Login läuft über Passkeys —</text>
+<text x="307" y="366" text-anchor="middle" font-size="12" fill="#3C3B38">die Karte wird dafür nie gebraucht.</text>
+<text x="307" y="384" text-anchor="middle" font-size="12" fill="#3C3B38">Rotation einfach nachholen,</text>
+<text x="307" y="402" text-anchor="middle" font-size="12" fill="#3C3B38">sobald die neue Karte da ist.</text>
+<text x="307" y="420" text-anchor="middle" font-size="12" fill="#6B6963">(Neuausstellung: 46 €, 2–5 Wochen)</text>
+
+<!-- Zelle: Zugang verloren / Dokument weg -->
+<rect x="435" y="294" width="255" height="180" fill="#FAE9E7" stroke="#A83A32" stroke-width="0.75"/>
+<text x="562" y="324" text-anchor="middle" font-size="13" font-weight="600" fill="#7E2B24">Neu-Registrierung</text>
+<text x="562" y="348" text-anchor="middle" font-size="12" fill="#3C3B38">Neue Karte beantragen, damit</text>
+<text x="562" y="366" text-anchor="middle" font-size="12" fill="#3C3B38">neu registrieren — P_neu ist frei.</text>
+<text x="562" y="384" text-anchor="middle" font-size="12" fill="#3C3B38">Alter Account: Schonfrist,</text>
+<text x="562" y="402" text-anchor="middle" font-size="12" fill="#3C3B38">dann Archiv (Soft-Delete);</text>
+<text x="562" y="420" text-anchor="middle" font-size="12" fill="#6B6963">Handle bleibt lange gesperrt.</text>
+
+<text x="30" y="500" font-size="11.5" fill="#6B6963">* Zugang = Passkeys / Recovery-Codes / E-Mail als Zusatzfaktor — nie die Karte selbst.</text>
+<text x="30" y="520" font-size="11.5" fill="#6B6963">Registry-Einträge werden nie gelöscht: eine wiedergefundene, entsperrte Karte würde ihr altes Pseudonym reaktivieren.</text>
+</svg>

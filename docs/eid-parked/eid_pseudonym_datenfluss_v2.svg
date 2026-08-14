@@ -1,0 +1,61 @@
+<svg width="100%" viewBox="0 0 720 630" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+<title>Datenfluss bei der Registrierung: Client vs. Server</title>
+<desc>Ausweisdaten werden nur lokal auf dem Nutzergerät verarbeitet; ausschließlich ein anonymes Pseudonym erreicht den Server. Dort prüft eine isolierte Uniqueness-Registry den Hash und meldet der Account-Datenbank nur ein Ja/Nein — der Hash selbst wird nie mit dem Account verknüpft.</desc>
+
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+
+<!-- ===== Client-Zone ===== -->
+<rect x="30" y="30" width="660" height="224" rx="16" fill="#E7F4EE" stroke="#14805E" stroke-width="0.75"/>
+<text x="50" y="60" font-size="14" font-weight="600" fill="#0B5C44">Nutzergerät (Client)</text>
+<text x="50" y="80" font-size="12" fill="#14805E">Personalausweis oder Reisepass via NFC</text>
+
+<!-- Schritt 1 -->
+<rect x="50" y="96" width="280" height="58" rx="10" fill="#FFFFFF" stroke="#9BB8AC" stroke-width="0.75"/>
+<text x="190" y="118" text-anchor="middle" dominant-baseline="central" font-size="13.5" font-weight="600" fill="#3C3B38">① Chip-Authentisierung</text>
+<text x="190" y="138" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6B6963">eID-PIN + Echtheitsprüfung des Chips</text>
+
+<line x1="334" y1="125" x2="384" y2="125" stroke="#6B6963" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- Schritt 2 -->
+<rect x="390" y="96" width="280" height="58" rx="10" fill="#FFFFFF" stroke="#9BB8AC" stroke-width="0.75"/>
+<text x="530" y="118" text-anchor="middle" dominant-baseline="central" font-size="13.5" font-weight="600" fill="#3C3B38">② RI-Protokoll / ZK-Proof</text>
+<text x="530" y="138" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6B6963">Pseudonym wird lokal berechnet</text>
+
+<!-- Bleibt lokal -->
+<rect x="50" y="170" width="620" height="62" rx="10" fill="#FBEDE7" stroke="#B4552F" stroke-width="0.75"/>
+<text x="360" y="194" text-anchor="middle" font-size="13" font-weight="600" fill="#8F3A1B">Verlässt das Gerät nie</text>
+<text x="360" y="216" text-anchor="middle" font-size="12" fill="#A34A25">Name, Geburtsdatum, Ausweisnummer, Foto — werden für die Prüfung gar nicht erst übertragen</text>
+
+<!-- ===== Übertragung ===== -->
+<line x1="190" y1="254" x2="190" y2="372" stroke="#6B6963" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="210" y="306" font-size="13" font-weight="600" fill="#3C3B38">③ nur das Pseudonym (ein Hash-Wert)</text>
+<text x="210" y="326" font-size="11.5" fill="#6B6963">beim Personalausweis über den eID-Server mit Berechtigungszertifikat</text>
+
+<!-- ===== Server-Zone ===== -->
+<rect x="30" y="380" width="660" height="220" rx="16" fill="#ECEBFB" stroke="#5B51C9" stroke-width="0.75"/>
+<text x="670" y="410" text-anchor="end" font-size="14" font-weight="600" fill="#423A9E">Server (Backend)</text>
+<text x="670" y="430" text-anchor="end" font-size="12" fill="#5B51C9">zwei isolierte Dienste, keine Fremdschlüssel</text>
+
+<!-- Uniqueness-Registry -->
+<rect x="50" y="446" width="260" height="72" rx="10" fill="#FFFFFF" stroke="#A5A1CE" stroke-width="0.75"/>
+<text x="180" y="468" text-anchor="middle" dominant-baseline="central" font-size="13.5" font-weight="600" fill="#3C3B38">④ Uniqueness-Registry</text>
+<text x="180" y="488" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6B6963">speichert nur Hash-Werte</text>
+<text x="180" y="506" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6B6963">schon vorhanden → Ablehnung</text>
+
+<line x1="314" y1="482" x2="404" y2="482" stroke="#6B6963" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="359" y="472" text-anchor="middle" font-size="11" fill="#55534E">»neu«</text>
+
+<!-- Account-Datenbank -->
+<rect x="410" y="446" width="260" height="72" rx="10" fill="#FFFFFF" stroke="#A5A1CE" stroke-width="0.75"/>
+<text x="540" y="468" text-anchor="middle" dominant-baseline="central" font-size="13.5" font-weight="600" fill="#3C3B38">⑤ Account anlegen</text>
+<text x="540" y="488" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6B6963">zufällige Account-ID</text>
+<text x="540" y="506" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6B6963">kein Pseudonym gespeichert</text>
+
+<text x="360" y="548" text-anchor="middle" font-size="12" fill="#55534E">Die Registry antwortet nur »neu« oder »bekannt« — der Hash wandert nie in die Account-DB.</text>
+<text x="360" y="572" text-anchor="middle" font-size="12" fill="#55534E">Keine gespeicherte Verknüpfung: die Zuordnung Pseudonym ↔ Account existiert nirgends.</text>
+
+</svg>
