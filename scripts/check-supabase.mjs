@@ -123,44 +123,59 @@ try {
 // Optionaler Testversand: npm run check -- --mail dein@postfach.de
 // Verschickt eine echte Anmeldemail und zeigt, woran der Versand scheitert.
 const mailArg = process.argv.indexOf("--mail");
-if (mailArg !== -1 && process.argv[mailArg + 1]) {
-  const to = process.argv[mailArg + 1];
-  console.log(`\nTestversand an ${to} …`);
+if (mailArg !== -1) {
+  const to = process.argv[mailArg + 1] ?? process.env.CHECK_TEST_EMAIL;
 
-  const res = await fetch(`${base}/auth/v1/otp`, {
-    method: "POST",
-    headers: { apikey: key, "Content-Type": "application/json" },
-    body: JSON.stringify({ email: to, create_user: true }),
-  });
-  const body = await res.text();
-
-  if (res.ok) {
-    ok("Supabase hat die Mail an den SMTP-Dienst übergeben");
-    hint("Kommt trotzdem nichts an, liegt es an Zustellung oder Spamfilter.");
-    hint("Im Resend-Dashboard unter „Emails\" steht der tatsächliche Inhalt.");
+  if (!to) {
+    fail(
+      "Keine Testadresse angegeben",
+      "npm run check -- --mail du@example.com, oder CHECK_TEST_EMAIL in .env.local setzen",
+    );
   } else {
-    let msg = body;
-    try {
-      msg = JSON.parse(body).msg ?? body;
-    } catch {}
-    fail(`Versand fehlgeschlagen (HTTP ${res.status}): ${msg}`);
+    console.log(`\nTestversand an ${to} …`);
+    hint(
+      "Muss die Adresse sein, mit der dein Resend-Konto angelegt wurde —",
+    );
+    hint("solange dort keine eigene Domain verifiziert ist.");
 
-    if (/sending (confirmation|magic link|recovery) email/i.test(msg)) {
-      hint("Supabase konnte die Mail nicht an den SMTP-Dienst übergeben.");
-      hint("Die häufigsten Ursachen bei Resend, in dieser Reihenfolge:");
-      hint("");
-      hint("1. Absenderadresse. Ohne eigene verifizierte Domain MUSS sie");
-      hint("   onboarding@resend.dev lauten. Jede andere wird abgelehnt.");
-      hint("2. Empfänger. Mit onboarding@resend.dev nimmt Resend nur die");
-      hint("   Adresse an, mit der dein Resend-Konto angelegt wurde.");
-      hint("3. Username. Wörtlich „resend\", nicht deine E-Mail-Adresse.");
-      hint("4. Passwort. Der API-Key (re_…), mit Recht „Sending access\".");
-      hint("5. Port 465.");
-      hint("");
-      hint("Den echten SMTP-Fehler zeigt das Supabase-Dashboard unter");
-      hint("Logs → Auth Logs. Danach suchen, nicht raten.");
+    const res = await fetch(`${base}/auth/v1/otp`, {
+      method: "POST",
+      headers: { apikey: key, "Content-Type": "application/json" },
+      body: JSON.stringify({ email: to, create_user: true }),
+    });
+    const body = await res.text();
+
+    if (res.ok) {
+      ok("Supabase hat die Mail an den SMTP-Dienst übergeben");
+      hint("Kommt trotzdem nichts an, liegt es an Zustellung oder Spamfilter.");
+      hint("Im Resend-Dashboard unter „Emails\" steht der tatsächliche Inhalt.");
+    } else {
+      let msg = body;
+      try {
+        msg = JSON.parse(body).msg ?? body;
+      } catch {}
+      fail(`Versand fehlgeschlagen (HTTP ${res.status}): ${msg}`);
+
+      if (/sending (confirmation|magic link|recovery) email/i.test(msg)) {
+        hint("Supabase konnte die Mail nicht an den SMTP-Dienst übergeben.");
+        hint("Zwei Ursachen sind möglich, und sie sehen von aussen gleich aus:");
+        hint("");
+        hint("A) Die Vorlage lässt sich nicht rendern. Prüfen, indem man");
+        hint("   „Confirm signup\" vorübergehend durch <p>{{ .Token }}</p>");
+        hint("   ersetzt. Geht es dann, war es ein Tippfehler in der Variable.");
+        hint("");
+        hint("B) Der SMTP-Versand scheitert. Bei Resend der Reihe nach:");
+        hint("   1. Empfänger — ohne eigene verifizierte Domain nimmt Resend");
+        hint("      NUR die Adresse an, mit der das Konto angelegt wurde.");
+        hint("   2. Absender — dann zwingend onboarding@resend.dev.");
+        hint("   3. Username — wörtlich „resend\", nicht die E-Mail-Adresse.");
+        hint("   4. Passwort — der API-Key (re_…) mit Recht „Sending access\".");
+        hint("   5. Port 465.");
+        hint("");
+        hint("Den Klartext-Fehler zeigt das Dashboard unter Logs → Auth Logs.");
+      }
+      failed = true;
     }
-    failed = true;
   }
 }
 
