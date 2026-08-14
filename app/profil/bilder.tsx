@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { imageUrl, relativeTime, type OwnPost } from "@/lib/post";
@@ -70,16 +71,19 @@ export function EigeneBilder({ posts }: { posts: OwnPost[] }) {
 
           return (
             <li key={post.id} className="group relative">
-              <div className="aspect-square overflow-hidden rounded-lg border border-line bg-line/30">
+              <Link
+                href={`/p/${post.id}`}
+                className="group block aspect-square overflow-hidden rounded-lg border border-line bg-line/30"
+              >
                 <Image
                   src={imageUrl(post.image_path)}
                   alt={post.caption ?? "Eigenes Bild"}
                   width={post.image_width}
                   height={post.image_height}
                   sizes="(max-width: 640px) 50vw, 180px"
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-cover transition-opacity group-hover:opacity-90"
                 />
-              </div>
+              </Link>
 
               <p className="mt-1.5 text-[0.75rem] text-muted">
                 {relativeTime(post.created_at)}
