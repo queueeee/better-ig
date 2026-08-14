@@ -13,12 +13,43 @@ export type OwnPost = {
   created_at: string;
 };
 
-export type FeedPost = OwnPost & {
-  author: {
-    handle: string;
-    display_name: string | null;
-  };
+export type Author = {
+  handle: string;
+  display_name: string | null;
 };
+
+export type FeedPost = OwnPost & {
+  author: Author;
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
+};
+
+export type Comment = {
+  id: string;
+  body: string;
+  created_at: string;
+  author_id: string;
+  author: Author;
+};
+
+/**
+ * PostgREST liefert verschachtelte Zähler als Array mit einem Objekt:
+ * `likes: [{ count: 3 }]`. Bei leerer Beziehung kann das Array fehlen
+ * oder leer sein — deshalb defensiv auslesen statt blind zugreifen.
+ */
+export function readCount(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (Array.isArray(value)) {
+    const first = value[0] as { count?: unknown } | undefined;
+    return typeof first?.count === "number" ? first.count : 0;
+  }
+  if (value && typeof value === "object" && "count" in value) {
+    const count = (value as { count: unknown }).count;
+    return typeof count === "number" ? count : 0;
+  }
+  return 0;
+}
 
 /** Öffentliche URL eines Bildes im posts-Bucket. */
 export function imageUrl(path: string): string {
@@ -50,4 +81,15 @@ export function relativeTime(iso: string): string {
     value /= size;
   }
   return formatter.format(-Math.round(value), "year");
+}
+
+/** „3 Likes", „1 Like", „Noch keine Likes" */
+export function likeLabel(count: number): string {
+  if (count === 0) return "Noch keine Likes";
+  return count === 1 ? "1 Like" : `${count} Likes`;
+}
+
+export function commentLabel(count: number): string {
+  if (count === 0) return "Kommentieren";
+  return count === 1 ? "1 Kommentar" : `${count} Kommentare`;
 }

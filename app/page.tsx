@@ -3,8 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getOwnProfile } from "@/lib/profile";
 import { getFeed } from "@/lib/feed";
-import { imageUrl, relativeTime } from "@/lib/post";
+import { commentLabel, imageUrl, relativeTime } from "@/lib/post";
 import { SetupHinweis } from "@/app/setup-hinweis";
+import { LikeKnopf } from "@/app/like-knopf";
 
 export default async function FeedPage() {
   const result = await getOwnProfile();
@@ -93,6 +94,20 @@ export default async function FeedPage() {
                   {post.caption}
                 </p>
               ) : null}
+
+              <div className="mt-4 flex items-center gap-6">
+                <LikeKnopf
+                  postId={post.id}
+                  count={post.likeCount}
+                  liked={post.likedByMe}
+                />
+                <Link
+                  href={`/p/${post.id}`}
+                  className="text-[0.85rem] text-muted underline decoration-line underline-offset-4 transition-colors hover:text-ink"
+                >
+                  {commentLabel(post.commentCount)}
+                </Link>
+              </div>
             </article>
           ))}
         </div>
