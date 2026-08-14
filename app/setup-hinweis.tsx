@@ -14,8 +14,9 @@ export function SetupHinweis() {
           Die Datenbank fehlt noch
         </h1>
         <p className="mt-4 text-[0.95rem] leading-relaxed text-muted">
-          Die Tabelle für Profile existiert in diesem Supabase-Projekt nicht.
-          Führ die Migration einmal aus:
+          In diesem Supabase-Projekt fehlt mindestens eine Migration. Führ die
+          Dateien aus <code className="rounded bg-line/50 px-1.5 py-0.5 font-mono text-[0.85rem] text-ink">supabase/migrations/</code>{" "}
+          der Reihe nach aus:
         </p>
         <ol className="mt-4 list-decimal space-y-2 pl-5 text-[0.95rem] leading-relaxed text-muted">
           <li>
@@ -23,11 +24,8 @@ export function SetupHinweis() {
             öffnen
           </li>
           <li>
-            Den Inhalt von{" "}
-            <code className="rounded bg-line/50 px-1.5 py-0.5 font-mono text-[0.85rem] text-ink">
-              supabase/migrations/0001_profiles.sql
-            </code>{" "}
-            einfügen
+            Den Inhalt der noch fehlenden Migration einfügen — die Dateien sind
+            nach Reihenfolge nummeriert
           </li>
           <li>
             Auf <span className="text-ink">Run</span> klicken und diese Seite neu

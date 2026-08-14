@@ -125,16 +125,26 @@ try {
       );
     }
 
-    const postsTable = await fetch(`${base}/rest/v1/posts?select=id&limit=1`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}` },
-    });
+    // Jede Migration bringt eine Tabelle mit; fehlt eine, ist klar welche.
+    const tables = [
+      ["posts", "0002_posts.sql"],
+      ["likes", "0003_likes_kommentare.sql"],
+      ["comments", "0003_likes_kommentare.sql"],
+      ["follows", "0004_folgen.sql"],
+    ];
 
-    if (postsTable.status === 404) {
-      fail("Die Tabelle „posts\" fehlt");
-      hint("Dashboard → SQL Editor → Inhalt von");
-      hint("supabase/migrations/0002_posts.sql einfügen und Run klicken.");
-    } else if (postsTable.ok || [401, 403].includes(postsTable.status)) {
-      ok("Tabelle „posts\" vorhanden");
+    for (const [name, migration] of tables) {
+      const res = await fetch(`${base}/rest/v1/${name}?select=*&limit=1`, {
+        headers: { apikey: key, Authorization: `Bearer ${key}` },
+      });
+
+      if (res.status === 404) {
+        fail(`Die Tabelle „${name}" fehlt`);
+        hint(`Dashboard → SQL Editor → Inhalt von`);
+        hint(`supabase/migrations/${migration} einfügen und Run klicken.`);
+      } else if (res.ok || [401, 403].includes(res.status)) {
+        ok(`Tabelle „${name}" vorhanden`);
+      }
     }
 
     // Ein öffentlicher Bucket antwortet auf eine Anfrage nach einer nicht

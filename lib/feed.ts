@@ -11,9 +11,13 @@ import {
 
 export const FEED_PAGE_SIZE = 30;
 
-/** Fehlt die Migration noch, ist ein leeres Ergebnis die richtige Antwort. */
+/**
+ * Fehlt eine Migration, meldet PostgREST je nach Fall eine unbekannte
+ * Tabelle (PGRST205 / 42P01) oder eine fehlende Beziehung (PGRST200).
+ * Beides heisst dasselbe: Die Datenbank ist noch nicht auf Stand.
+ */
 function isMissingTable(code: string | undefined) {
-  return code === "PGRST205" || code === "42P01";
+  return code === "PGRST205" || code === "42P01" || code === "PGRST200";
 }
 
 const POST_FIELDS =
@@ -121,7 +125,7 @@ export async function getPublicProfile(
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, handle, display_name, posts(count), followers:follows!follows_following_id_fkey(count), following:follows!follows_follower_id_fkey(count)",
+      "id, handle, display_name, posts:posts!posts_author_id_fkey(count), followers:follows!follows_following_id_fkey(count), following:follows!follows_follower_id_fkey(count)",
     )
     .eq("handle", handle)
     .maybeSingle();

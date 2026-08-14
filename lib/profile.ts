@@ -32,8 +32,9 @@ export async function getOwnProfile(): Promise<ProfileResult> {
     .maybeSingle();
 
   if (error) {
-    // PGRST205: PostgREST kennt die Tabelle nicht; 42P01: Postgres kennt sie nicht.
-    if (error.code === "PGRST205" || error.code === "42P01") {
+    // PGRST205 / 42P01: Tabelle unbekannt. PGRST200: Beziehung fehlt, also
+    // eine spätere Migration noch nicht ausgeführt.
+    if (["PGRST205", "42P01", "PGRST200"].includes(error.code)) {
       return { status: "table-missing" };
     }
     throw new Error(`Profil konnte nicht geladen werden: ${error.message}`);
