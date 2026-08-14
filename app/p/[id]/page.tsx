@@ -6,6 +6,7 @@ import { getComments, getPost } from "@/lib/feed";
 import { imageUrl, relativeTime } from "@/lib/post";
 import { SetupHinweis } from "@/app/setup-hinweis";
 import { LikeKnopf } from "@/app/like-knopf";
+import { Bildtext } from "@/app/bildtext";
 import { Kommentare } from "./kommentare";
 
 export default async function PostPage({
@@ -70,11 +71,7 @@ export default async function PostPage({
           />
         </div>
 
-        {post.caption ? (
-          <p className="mt-3 text-[0.95rem] leading-relaxed whitespace-pre-line">
-            {post.caption}
-          </p>
-        ) : null}
+        {post.caption ? <Bildtext text={post.caption} /> : null}
 
         <div className="mt-4">
           <LikeKnopf

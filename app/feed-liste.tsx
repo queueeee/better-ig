@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { commentLabel, imageUrl, relativeTime, type FeedPost } from "@/lib/post";
 import { LikeKnopf } from "@/app/like-knopf";
+import { Bildtext } from "@/app/bildtext";
 import { loadMorePosts } from "@/app/actions";
 
 type Props = {
@@ -50,11 +51,7 @@ function Beitrag({ post, eager }: { post: FeedPost; eager: boolean }) {
         />
       </Link>
 
-      {post.caption ? (
-        <p className="mt-3 text-[0.95rem] leading-relaxed whitespace-pre-line">
-          {post.caption}
-        </p>
-      ) : null}
+      {post.caption ? <Bildtext text={post.caption} /> : null}
 
       <div className="mt-4 flex items-center gap-6">
         <LikeKnopf

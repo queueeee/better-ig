@@ -133,6 +133,20 @@ try {
       ["follows", "0004_folgen.sql"],
     ];
 
+    // Migration 0005 legt keine Tabelle an, sondern Spalten — erkennbar
+    // daran, ob nach hashtags gefragt werden darf.
+    const hashtagCol = await fetch(
+      `${base}/rest/v1/posts?select=hashtags&limit=1`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+    );
+    if (hashtagCol.status === 400) {
+      fail("Suche und Hashtags fehlen");
+      hint("Dashboard → SQL Editor → Inhalt von");
+      hint("supabase/migrations/0005_suche_hashtags.sql einfügen und Run.");
+    } else if (hashtagCol.ok || [401, 403].includes(hashtagCol.status)) {
+      ok("Suche und Hashtags eingerichtet");
+    }
+
     for (const [name, migration] of tables) {
       const res = await fetch(`${base}/rest/v1/${name}?select=*&limit=1`, {
         headers: { apikey: key, Authorization: `Bearer ${key}` },

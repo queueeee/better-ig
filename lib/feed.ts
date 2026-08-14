@@ -130,6 +130,73 @@ export async function getFeed(
   return raw.map((post) => shape(post, liked));
 }
 
+/**
+ * Beiträge nach Text durchsuchen. „websearch" ist für eine Suchleiste die
+ * richtige Wahl: Es versteht Anführungszeichen, „oder" und ein führendes
+ * Minus als Ausschluss — und wirft bei keiner Eingabe einen Syntaxfehler.
+ * Die strengere Standardvariante würde schon an einem einzelnen „&" scheitern.
+ */
+export async function searchPosts(
+  query: string,
+  limit = FEED_PAGE_SIZE,
+): Promise<FeedPost[]> {
+  const term = query.trim();
+  if (!term) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("posts")
+    .select(POST_FIELDS)
+    .textSearch("fts", term, { type: "websearch", config: "german" })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    if (isMissingTable(error.code)) return [];
+    throw new Error(`Suche fehlgeschlagen: ${error.message}`);
+  }
+
+  const raw = (data ?? []) as unknown as RawPost[];
+  const liked = await likedPostIds(raw.map((post) => post.id));
+  return raw.map((post) => shape(post, liked));
+}
+
+/** Alle Beiträge zu einem Hashtag. */
+export async function getPostsByHashtag(
+  tag: string,
+  limit = FEED_PAGE_SIZE,
+): Promise<FeedPost[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("posts")
+    .select(POST_FIELDS)
+    .contains("hashtags", [tag.toLowerCase()])
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    if (isMissingTable(error.code)) return [];
+    throw new Error(`Beiträge konnten nicht geladen werden: ${error.message}`);
+  }
+
+  const raw = (data ?? []) as unknown as RawPost[];
+  const liked = await likedPostIds(raw.map((post) => post.id));
+  return raw.map((post) => shape(post, liked));
+}
+
+export type HashtagHit = { tag: string; anzahl: number };
+
+/** Die meistgenutzten Hashtags. */
+export async function getTopHashtags(limit = 20): Promise<HashtagHit[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("top_hashtags", {
+    limit_count: limit,
+  });
+
+  if (error) return [];
+  return (data ?? []) as HashtagHit[];
+}
+
 export type ProfileHit = {
   id: string;
   handle: string;
