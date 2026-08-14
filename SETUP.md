@@ -43,17 +43,16 @@ Das ist der Schritt, den man leicht übersieht: Supabase verschickt
 standardmäßig einen **Magic Link**, die App erwartet aber einen sechsstelligen
 **Code**.
 
-Unter **Authentication → Email Templates → Magic Link** die Vorlage bearbeiten
-und `{{ .Token }}` einsetzen, zum Beispiel:
+Unter **Authentication → Email Templates → Magic Link** den Inhalt von
+[`supabase/templates/magic-link.html`](supabase/templates/magic-link.html)
+einfügen und speichern.
 
-```html
-<h2>Dein Anmeldecode</h2>
-<p>{{ .Token }}</p>
-<p>Der Code gilt eine Stunde.</p>
-```
+Entscheidend ist die Variable `{{ .Token }}` — sie wird zum sechsstelligen Code.
+Ohne sie kommt eine Mail ohne Code an, und die Anmeldung per E-Mail funktioniert
+nicht.
 
-Ohne diese Änderung kommt eine Mail ohne Code an und die Anmeldung per E-Mail
-funktioniert nicht.
+Die Vorlage liegt im Repo, weil Dashboard-Inhalte sonst nirgends versioniert
+sind und bei einem neuen Projekt verloren gehen.
 
 ## 5. Starten
 
