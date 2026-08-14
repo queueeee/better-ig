@@ -120,6 +120,50 @@ try {
   fail(`Projekt nicht erreichbar: ${err.message}`);
 }
 
+// Optionaler Testversand: npm run check -- --mail dein@postfach.de
+// Verschickt eine echte Anmeldemail und zeigt, woran der Versand scheitert.
+const mailArg = process.argv.indexOf("--mail");
+if (mailArg !== -1 && process.argv[mailArg + 1]) {
+  const to = process.argv[mailArg + 1];
+  console.log(`\nTestversand an ${to} …`);
+
+  const res = await fetch(`${base}/auth/v1/otp`, {
+    method: "POST",
+    headers: { apikey: key, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: to, create_user: true }),
+  });
+  const body = await res.text();
+
+  if (res.ok) {
+    ok("Supabase hat die Mail an den SMTP-Dienst übergeben");
+    hint("Kommt trotzdem nichts an, liegt es an Zustellung oder Spamfilter.");
+    hint("Im Resend-Dashboard unter „Emails\" steht der tatsächliche Inhalt.");
+  } else {
+    let msg = body;
+    try {
+      msg = JSON.parse(body).msg ?? body;
+    } catch {}
+    fail(`Versand fehlgeschlagen (HTTP ${res.status}): ${msg}`);
+
+    if (/sending (confirmation|magic link|recovery) email/i.test(msg)) {
+      hint("Supabase konnte die Mail nicht an den SMTP-Dienst übergeben.");
+      hint("Die häufigsten Ursachen bei Resend, in dieser Reihenfolge:");
+      hint("");
+      hint("1. Absenderadresse. Ohne eigene verifizierte Domain MUSS sie");
+      hint("   onboarding@resend.dev lauten. Jede andere wird abgelehnt.");
+      hint("2. Empfänger. Mit onboarding@resend.dev nimmt Resend nur die");
+      hint("   Adresse an, mit der dein Resend-Konto angelegt wurde.");
+      hint("3. Username. Wörtlich „resend\", nicht deine E-Mail-Adresse.");
+      hint("4. Passwort. Der API-Key (re_…), mit Recht „Sending access\".");
+      hint("5. Port 465.");
+      hint("");
+      hint("Den echten SMTP-Fehler zeigt das Supabase-Dashboard unter");
+      hint("Logs → Auth Logs. Danach suchen, nicht raten.");
+    }
+    failed = true;
+  }
+}
+
 console.log(
   failed
     ? "\nNoch nicht startklar.\n"
