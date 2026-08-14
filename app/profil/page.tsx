@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getOwnProfile } from "@/lib/profile";
+import { getOwnPosts } from "@/lib/feed";
 import { SetupHinweis } from "@/app/setup-hinweis";
 import { Passkeys } from "@/app/passkeys";
+import { EigeneBilder } from "./bilder";
 
 export default async function ProfilPage() {
   const result = await getOwnProfile();
@@ -12,6 +14,7 @@ export default async function ProfilPage() {
   if (!result.profile) redirect("/willkommen");
 
   const { profile, email } = result;
+  const posts = await getOwnPosts(result.userId);
 
   return (
     <main className="mx-auto w-full max-w-xl flex-1 px-6 py-10">
@@ -40,6 +43,7 @@ export default async function ProfilPage() {
         {email ? <span className="text-muted/70"> · {email}</span> : null}
       </p>
 
+      <EigeneBilder posts={posts} />
       <Passkeys />
     </main>
   );

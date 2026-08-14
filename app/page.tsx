@@ -2,7 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getOwnProfile } from "@/lib/profile";
-import { getFeed, imageUrl, relativeTime } from "@/lib/feed";
+import { getFeed } from "@/lib/feed";
+import { imageUrl, relativeTime } from "@/lib/post";
 import { SetupHinweis } from "@/app/setup-hinweis";
 
 export default async function FeedPage() {
