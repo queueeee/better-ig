@@ -56,6 +56,11 @@ function readableError(error: unknown): string {
       return "Der Code ist abgelaufen. Fordere unten einen neuen an.";
     case "validation_failed":
       return "Der Code ist unvollständig.";
+    case "unexpected_failure":
+      // Fast immer der Mailversand: Der Anbieter hat die Nachricht
+      // abgelehnt. Ohne verifizierte Domain nimmt Resend nur die eigene
+      // Kontoadresse an — jede andere scheitert genau hier.
+      return "Der Code konnte nicht verschickt werden. Prüf die Zustellung im Postfach des Absenders — bei einem SMTP-Anbieter ohne verifizierte Domain sind fremde Empfänger gesperrt.";
   }
 
   // Ein alter Code wird ungültig, sobald ein neuer angefordert wurde —
