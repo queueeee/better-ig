@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bilder
 
-## Getting Started
+Ein kleines Bilder-Netzwerk ohne Passwörter. Anmeldung per Passkey, Bilder
+werden auf dem Gerät verkleinert und von ihren Metadaten befreit, bevor sie
+hochgeladen werden.
 
-First, run the development server:
+Next.js 16 · React 19 · Tailwind 4 · Supabase
+
+## Einrichten
+
+Siehe [SETUP.md](SETUP.md) — Supabase-Projekt, Passkeys, Mailversand, Migrationen.
+Kurzfassung:
 
 ```bash
+npm install
+cp .env.local.example .env.local   # Werte aus dem Supabase-Dashboard eintragen
+npm run check                      # prüft, ob die Einrichtung vollständig ist
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`npm run check -- --mail` verschickt zusätzlich eine echte Anmeldemail und
+zeigt, woran der Versand scheitert.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Wie die Anmeldung funktioniert
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Ein Passkey kann bei Supabase nicht der einzige Faktor sein — ihn zu
+registrieren setzt eine bestätigte Sitzung voraus. Daraus folgt:
 
-## Learn More
+1. **Erstes Mal:** Code per E-Mail → angemeldet → Passkey einrichten
+2. **Danach:** ein Klick, ohne E-Mail-Eingabe
+3. **Neues Gerät:** wieder Code, dann dort einen eigenen Passkey anlegen
 
-To learn more about Next.js, take a look at the following resources:
+Der Code-Weg ist damit kein Provisorium, sondern der dauerhafte
+Wiedereinstieg, wenn ein Gerät verloren geht.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Was mit Bildern passiert
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Bilder werden vollständig im Browser aufbereitet, bevor sie das Gerät
+verlassen (`lib/bild.ts`): gedreht anhand der EXIF-Ausrichtung, auf 1440 Pixel
+lange Kante verkleinert, als JPEG neu kodiert.
 
-## Deploy on Vercel
+Das Neuzeichnen auf ein Canvas erzeugt eine neue Datei, die nur noch Pixel
+enthält. Sämtliche Metadaten verschwinden dabei — **auch die
+GPS-Koordinaten**, die Handys standardmäßig in jedes Foto schreiben. Ein
+Foto, das den Wohnort verrät, wird also gar nicht erst hochgeladen.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+JPEG ist dabei kein Zufall: Safari unterstützt `canvas.toBlob` mit WebP nicht
+und fällt still auf PNG zurück, was die Datei vergrößert statt sie zu
+verkleinern.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Aufbau
+
+| Pfad | Zweck |
+|---|---|
+| `proxy.ts` | Sitzung auffrischen, Routen schützen (hieß vor Next.js 16 `middleware.ts`) |
+| `lib/supabase/` | Clients für Browser, Server und Proxy |
+| `lib/bild.ts` | Verkleinern, drehen, Metadaten entfernen |
+| `lib/feed.ts` | Feed-Abfrage, Bild-URLs, relative Zeitangaben |
+| `lib/profile.ts` | Profil des angemeldeten Nutzers |
+| `app/login/` | Anmeldung per Passkey oder Code |
+| `app/willkommen/` | Namenswahl beim ersten Anmelden |
+| `app/hochladen/` | Bild auswählen, aufbereiten, veröffentlichen |
+| `app/profil/` | Profil und Passkey-Verwaltung |
+| `supabase/migrations/` | Tabellen, Zugriffsregeln, Speicher-Bucket |
+| `supabase/templates/` | E-Mail-Vorlagen für das Dashboard |
+| `scripts/check-supabase.mjs` | Prüft die Einrichtung, testet den Mailversand |
+
+Datenbank-Migrationen laufen über den SQL Editor im Dashboard, solange kein
+Docker für die lokale Supabase-Umgebung installiert ist.
+
+## Zugriffsregeln
+
+Alles läuft über Row Level Security in der Datenbank, nicht über Prüfungen im
+Anwendungscode:
+
+- Profile und Beiträge dürfen alle Angemeldeten lesen
+- Schreiben und Löschen nur die eigene Zeile
+- Im Bildspeicher darf jeder nur in seinen eigenen Ordner schreiben
+
+## Zurückgestellt
+
+`docs/eid-parked/` enthält ein ausgearbeitetes Konzept für Identitätsprüfung
+per Personalausweis-Chip — ein Konto pro Person, ohne dass Namen oder
+Ausweisnummern je den Server erreichen. Nicht umgesetzt; die README dort
+erklärt Stand und Fallstricke.
