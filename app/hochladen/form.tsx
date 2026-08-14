@@ -27,7 +27,14 @@ function readableError(error: unknown): string {
   return "Das Hochladen hat nicht geklappt. Versuch es noch einmal.";
 }
 
-export function HochladenForm({ userId }: { userId: string }) {
+export function HochladenForm({
+  userId,
+  art,
+}: {
+  userId: string;
+  art: "post" | "story";
+}) {
+  const istStory = art === "story";
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<Phase>("leer");
@@ -71,6 +78,7 @@ export function HochladenForm({ userId }: { userId: string }) {
     setError(null);
     setPhase("laedt");
     const supabase = createClient();
+    const bucket = istStory ? "stories" : "posts";
     // Zufälliger Name statt des Originalnamens: Dateinamen verraten oft
     // mehr, als man denkt, und der Pfad ist bei einem öffentlichen Bucket
     // die einzige Hürde.
@@ -78,25 +86,36 @@ export function HochladenForm({ userId }: { userId: string }) {
 
     try {
       const { error: uploadError } = await supabase.storage
-        .from("posts")
+        .from(bucket)
         .upload(path, image.blob, {
           contentType: "image/jpeg",
           cacheControl: "31536000",
         });
       if (uploadError) throw uploadError;
 
-      const { error: insertError } = await supabase.from("posts").insert({
-        author_id: userId,
-        image_path: path,
-        image_width: image.width,
-        image_height: image.height,
-        caption: caption.trim() || null,
-      });
+      const { error: insertError } = await supabase
+        .from(istStory ? "stories" : "posts")
+        .insert(
+          istStory
+            ? {
+                author_id: userId,
+                image_path: path,
+                image_width: image.width,
+                image_height: image.height,
+              }
+            : {
+                author_id: userId,
+                image_path: path,
+                image_width: image.width,
+                image_height: image.height,
+                caption: caption.trim() || null,
+              },
+        );
 
       if (insertError) {
-        // Sonst bliebe eine Datei ohne Beitrag im Speicher liegen —
+        // Sonst bliebe eine Datei ohne Eintrag im Speicher liegen —
         // Supabase räumt nichts automatisch auf.
-        await supabase.storage.from("posts").remove([path]);
+        await supabase.storage.from(bucket).remove([path]);
         throw insertError;
       }
 
@@ -165,27 +184,40 @@ export function HochladenForm({ userId }: { userId: string }) {
         </p>
       ) : null}
 
-      <label
-        htmlFor="caption"
-        className="mt-8 block text-[0.8rem] font-medium uppercase tracking-wider text-muted"
-      >
-        Text <span className="normal-case">(optional)</span>
-      </label>
-      <textarea
-        id="caption"
-        rows={3}
-        maxLength={2200}
-        value={caption}
-        onChange={(event) => setCaption(event.target.value)}
-        className="mt-2 w-full resize-none rounded-lg border border-line bg-transparent px-4 py-3 text-[0.95rem] leading-relaxed outline-none transition-colors focus:border-accent"
-      />
+      {istStory ? (
+        <p className="mt-8 text-[0.85rem] leading-relaxed text-muted">
+          Stories verschwinden nach 24 Stunden von selbst.
+        </p>
+      ) : (
+        <>
+          <label
+            htmlFor="caption"
+            className="mt-8 block text-[0.8rem] font-medium uppercase tracking-wider text-muted"
+          >
+            Text <span className="normal-case">(optional)</span>
+          </label>
+          <textarea
+            id="caption"
+            rows={3}
+            maxLength={2200}
+            value={caption}
+            onChange={(event) => setCaption(event.target.value)}
+            placeholder="Mit #hashtags findet man es wieder"
+            className="mt-2 w-full resize-none rounded-lg border border-line bg-transparent px-4 py-3 text-[0.95rem] leading-relaxed outline-none transition-colors placeholder:text-muted/60 focus:border-accent"
+          />
+        </>
+      )}
 
       <button
         type="submit"
         disabled={!image || phase === "laedt"}
         className="mt-6 w-full rounded-lg bg-accent px-5 py-3.5 text-[0.95rem] font-medium text-paper transition-colors hover:bg-accent-strong disabled:opacity-50"
       >
-        {phase === "laedt" ? "Moment …" : "Veröffentlichen"}
+        {phase === "laedt"
+          ? "Moment …"
+          : istStory
+            ? "Zur Story hinzufügen"
+            : "Veröffentlichen"}
       </button>
     </form>
   );

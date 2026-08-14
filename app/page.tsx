@@ -2,7 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getOwnProfile } from "@/lib/profile";
 import { FEED_PAGE_SIZE, getFeed, getFollowingIds } from "@/lib/feed";
+import {
+  cleanupOwnExpiredStories,
+  getStories,
+} from "@/lib/stories";
 import { SetupHinweis } from "@/app/setup-hinweis";
+import { StoryLeiste } from "@/app/story-leiste";
 import { Kopfzeile } from "@/app/kopfzeile";
 import { FeedListe } from "@/app/feed-liste";
 
@@ -16,11 +21,23 @@ export default async function FeedPage() {
   // Die eigenen Beiträge gehören dazu — sonst wäre der Feed am ersten Tag
   // leer, obwohl man gerade etwas hochgeladen hat.
   const following = await getFollowingIds(result.userId);
-  const posts = await getFeed(30, [...following, result.userId]);
+  const sichtbar = [...following, result.userId];
+
+  // Beim Öffnen der App die eigenen abgelaufenen Stories entfernen. Ein
+  // zentraler Aufräumjob bräuchte den geheimen Schlüssel, um fremde
+  // Dateien löschen zu dürfen — den soll diese App nirgends halten.
+  await cleanupOwnExpiredStories();
+
+  const [posts, stories] = await Promise.all([
+    getFeed(30, sichtbar),
+    getStories(result.userId, sichtbar),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-xl flex-1 px-6 py-10">
       <Kopfzeile handle={result.profile.handle} active="feed" />
+
+      <StoryLeiste gruppen={stories} />
 
       {posts.length === 0 ? (
         <section className="py-20 text-center">

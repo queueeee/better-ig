@@ -4,7 +4,13 @@ import { getOwnProfile } from "@/lib/profile";
 import { SetupHinweis } from "@/app/setup-hinweis";
 import { HochladenForm } from "./form";
 
-export default async function HochladenPage() {
+export default async function HochladenPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ art?: string }>;
+}) {
+  const { art: artParam } = await searchParams;
+  const art = artParam === "story" ? "story" : "post";
   const result = await getOwnProfile();
 
   if (result.status === "no-session") redirect("/login");
@@ -26,10 +32,10 @@ export default async function HochladenPage() {
       </header>
 
       <h1 className="mt-10 font-display text-[2rem] leading-[1.1] font-semibold tracking-tight">
-        Neues Bild
+        {art === "story" ? "Neue Story" : "Neues Bild"}
       </h1>
 
-      <HochladenForm userId={result.userId} />
+      <HochladenForm userId={result.userId} art={art} />
     </main>
   );
 }

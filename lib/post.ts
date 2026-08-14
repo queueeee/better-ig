@@ -62,6 +62,21 @@ export function readCount(value: unknown): number {
   return 0;
 }
 
+export type Story = {
+  id: string;
+  image_path: string;
+  image_width: number;
+  image_height: number;
+  created_at: string;
+  expires_at: string;
+};
+
+/** URL eines Story-Bildes. */
+export function storyUrl(path: string): string {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/\/$/, "");
+  return `${base}/storage/v1/object/public/stories/${path}`;
+}
+
 /** Öffentliche URL eines Bildes im posts-Bucket. */
 export function imageUrl(path: string): string {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/\/$/, "");

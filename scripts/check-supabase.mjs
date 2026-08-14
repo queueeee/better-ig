@@ -131,6 +131,7 @@ try {
       ["likes", "0003_likes_kommentare.sql"],
       ["comments", "0003_likes_kommentare.sql"],
       ["follows", "0004_folgen.sql"],
+      ["stories", "0006_stories.sql"],
     ];
 
     // Migration 0005 legt keine Tabelle an, sondern Spalten — erkennbar
