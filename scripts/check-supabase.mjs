@@ -85,10 +85,20 @@ try {
     if (settings.passkeys_enabled === true) {
       ok("Passkeys sind aktiviert");
     } else if (settings.passkeys_enabled === false) {
-      fail(
-        "Passkeys sind im Projekt NICHT aktiviert",
-        "Dashboard → Authentication → Passkeys einschalten, RP ID: localhost, Origin: http://localhost:3000",
-      );
+      fail("Passkeys sind im Projekt NICHT aktiviert");
+      hint("Dashboard → Authentication → Passkeys, dort „Enable Passkey");
+      hint("authentication\". NICHT der WebAuthn-Schalter unter Multi-Factor");
+      hint("Authentication — der ist eine andere Einstellung und lässt");
+      hint("passkeys_enabled unberührt.");
+      hint("");
+      hint("Alle drei Felder sind Pflicht, sonst speichert der Server nicht:");
+      hint("  Relying Party ID       localhost");
+      hint("  Relying Party Origins  http://localhost:3000");
+      hint("  Display Name           (frei wählbar)");
+      hint("");
+      hint("Die RP ID ist die nackte Domain — ohne https://, Port und Slash.");
+      hint("Jeder Origin-Host muss der RP ID entsprechen oder eine Subdomain");
+      hint("davon sein.");
     } else {
       console.log(
         "  \x1b[33m?\x1b[0m Passkey-Status nicht in der Antwort — Feldname kann sich geändert haben",
