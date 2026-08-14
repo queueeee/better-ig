@@ -6,7 +6,10 @@ import { createClient } from "@/lib/supabase/client";
 
 type Step = "choose" | "email" | "code";
 
-/** Übersetzt die Fehlercodes, die im Anmeldeweg tatsächlich vorkommen. */
+/** Supabase erlaubt pro Adresse nur alle 60 Sekunden einen neuen Code. */
+const RESEND_COOLDOWN = 60;
+const STORAGE_KEY = "pending-login-email";
+
 function readableError(error: unknown): string {
   const code =
     typeof error === "object" && error !== null && "code" in error
@@ -15,6 +18,10 @@ function readableError(error: unknown): string {
   const name =
     typeof error === "object" && error !== null && "name" in error
       ? String((error as { name: unknown }).name)
+      : "";
+  const message =
+    typeof error === "object" && error !== null && "message" in error
+      ? String((error as { message: unknown }).message)
       : "";
 
   if (name === "NotAllowedError" || name === "AbortError") {
@@ -35,12 +42,20 @@ function readableError(error: unknown): string {
     case "user_banned":
       return "Dieses Konto ist gesperrt.";
     case "over_email_send_rate_limit":
-      return "Zu viele Codes angefordert. Warte einen Moment.";
+      return "Zu viele Codes angefordert. Warte eine Minute.";
     case "otp_expired":
-      return "Der Code ist abgelaufen. Fordere einen neuen an.";
-    default:
-      return "Das hat nicht geklappt. Versuch es noch einmal.";
+      return "Der Code ist abgelaufen. Fordere unten einen neuen an.";
+    case "validation_failed":
+      return "Der Code ist unvollständig.";
   }
+
+  // Ein alter Code wird ungültig, sobald ein neuer angefordert wurde —
+  // der häufigste Fall, und Supabase meldet ihn nur generisch.
+  if (/token|otp|invalid|expired/i.test(message)) {
+    return "Dieser Code passt nicht. Wurde inzwischen ein neuer angefordert, gilt nur noch der neueste — fordere unten einen an.";
+  }
+
+  return "Das hat nicht geklappt. Versuch es noch einmal.";
 }
 
 export default function LoginPage() {
@@ -50,15 +65,31 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [passkeySupported, setPasskeySupported] = useState(true);
+  const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
     setPasskeySupported(
       typeof window !== "undefined" && !!window.PublicKeyCredential,
     );
+    // Nach einem Neuladen der Seite wäre die Adresse sonst weg und der
+    // bereits verschickte Code nicht mehr einlösbar.
+    const saved = sessionStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      setEmail(saved);
+      setStep("code");
+    }
   }, []);
 
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown((value) => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
+
   function done() {
+    sessionStorage.removeItem(STORAGE_KEY);
     router.refresh();
     router.push("/");
   }
@@ -77,18 +108,45 @@ export default function LoginPage() {
     }
   }
 
+  async function requestCode(target: string, isResend = false) {
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      email: target,
+      options: { shouldCreateUser: true },
+    });
+    if (error) throw error;
+
+    sessionStorage.setItem(STORAGE_KEY, target);
+    setCooldown(RESEND_COOLDOWN);
+    setCode("");
+    setStep("code");
+    setNotice(
+      isResend
+        ? "Neuer Code verschickt. Frühere Codes gelten nicht mehr."
+        : null,
+    );
+  }
+
   async function sendCode(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { shouldCreateUser: true },
-      });
-      if (error) throw error;
-      setStep("code");
+      await requestCode(email);
+    } catch (err) {
+      setError(readableError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendCode() {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await requestCode(email, true);
     } catch (err) {
       setError(readableError(err));
     } finally {
@@ -100,6 +158,7 @@ export default function LoginPage() {
     event.preventDefault();
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.verifyOtp({
@@ -113,6 +172,14 @@ export default function LoginPage() {
       setError(readableError(err));
       setBusy(false);
     }
+  }
+
+  function restart() {
+    sessionStorage.removeItem(STORAGE_KEY);
+    setError(null);
+    setNotice(null);
+    setCode("");
+    setStep("choose");
   }
 
   return (
@@ -135,6 +202,12 @@ export default function LoginPage() {
             className="mt-6 border-l-2 border-danger pl-3 text-[0.9rem] leading-relaxed text-danger"
           >
             {error}
+          </p>
+        ) : null}
+
+        {notice ? (
+          <p className="mt-6 border-l-2 border-accent pl-3 text-[0.9rem] leading-relaxed text-muted">
+            {notice}
           </p>
         ) : null}
 
@@ -203,10 +276,7 @@ export default function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setError(null);
-                setStep("choose");
-              }}
+              onClick={restart}
               className="mt-6 w-full text-[0.85rem] text-muted underline decoration-line underline-offset-4 transition-colors hover:text-ink"
             >
               Zurück
@@ -217,8 +287,8 @@ export default function LoginPage() {
         {step === "code" ? (
           <form onSubmit={verifyCode} className="mt-8">
             <p className="text-[0.9rem] leading-relaxed text-muted">
-              Wir haben einen sechsstelligen Code an{" "}
-              <span className="text-ink">{email}</span> geschickt.
+              Code aus der Mail an <span className="text-ink">{email}</span>.
+              Gültig ist immer nur der zuletzt verschickte.
             </p>
             <label
               htmlFor="code"
@@ -247,13 +317,21 @@ export default function LoginPage() {
             >
               {busy ? "Wird geprüft …" : "Anmelden"}
             </button>
+
             <button
               type="button"
-              onClick={() => {
-                setError(null);
-                setCode("");
-                setStep("email");
-              }}
+              onClick={resendCode}
+              disabled={busy || cooldown > 0}
+              className="mt-4 w-full text-[0.85rem] text-muted underline decoration-line underline-offset-4 transition-colors hover:text-ink disabled:no-underline disabled:opacity-60"
+            >
+              {cooldown > 0
+                ? `Neuen Code in ${cooldown} s`
+                : "Neuen Code schicken"}
+            </button>
+
+            <button
+              type="button"
+              onClick={restart}
               className="mt-6 w-full text-[0.85rem] text-muted underline decoration-line underline-offset-4 transition-colors hover:text-ink"
             >
               Andere E-Mail-Adresse
