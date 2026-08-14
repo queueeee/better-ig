@@ -73,6 +73,59 @@ Callback-Route-Handler.
 Die Vorlagen liegen im Repo, weil Dashboard-Inhalte sonst nirgends versioniert
 sind und bei einem neuen Projekt verloren gehen.
 
+## 4b. Mailversand über Resend (empfohlen, sobald du mehr als zweimal testest)
+
+Der eingebaute Supabase-Mailer erlaubt **zwei Mails pro Stunde** und stellt nur
+an Mitglieder deiner Supabase-Organisation zu. Beides fällt mit einem eigenen
+SMTP-Anbieter weg.
+
+### Was ohne eigene Domain geht — und was nicht
+
+Resend verlangt für den regulären Versand eine verifizierte Domain. Ohne eine
+solche darfst du zwar `onboarding@resend.dev` als Absender nutzen, aber
+**ausschließlich an die E-Mail-Adresse, mit der dein Resend-Konto angelegt ist**.
+Jeder andere Empfänger wird mit „You can only send testing emails to your own
+email address" abgelehnt.
+
+Für die Entwicklung reicht das trotzdem und ist eine echte Verbesserung: statt
+zwei Mails pro Stunde stehen dir 100 pro Tag zu, und das Supabase-Limit steigt
+auf 30 pro Stunde. Für **echte Nutzer** brauchst du eine Domain — die kostet
+wenige Euro im Jahr, und du brauchst weder Webserver noch Hosting, nur
+DNS-Verwaltung.
+
+### Einrichtung
+
+1. Konto auf [resend.com](https://resend.com) anlegen — mit **genau der Adresse,
+   an die du dir Testcodes schicken willst**.
+2. *API Keys → Create API Key*, Berechtigung **Sending access** (nicht *Full
+   access*). Der Schlüssel beginnt mit `re_` und wird nur einmal angezeigt.
+3. Im Supabase-Dashboard unter *Authentication → Emails → SMTP Settings*
+   **Enable Custom SMTP** einschalten und eintragen:
+
+   | Feld | Wert |
+   |---|---|
+   | Host | `smtp.resend.com` |
+   | Port | `465` |
+   | Username | `resend` — wörtlich dieser String, nicht deine Adresse |
+   | Password | dein Resend-API-Key |
+   | Sender email | `onboarding@resend.dev` (bzw. deine verifizierte Domain) |
+   | Sender name | frei wählbar |
+
+4. Unter *Authentication → Rate Limits* das Limit für gesendete Mails anheben.
+   Nach dem Umstellen steht es auf 30 pro Stunde; mehr als 100 am Tag lässt die
+   Resend-Gratisstufe ohnehin nicht zu.
+
+### Später: eigene Domain
+
+*Domains → Add Domain*, dabei eine Subdomain wie `mail.deinprojekt.de` statt der
+Wurzeldomain verwenden. Resend zeigt die nötigen DNS-Einträge an (TXT für DKIM,
+MX plus TXT für SPF). Nach dem Eintragen dauert die Prüfung meist unter einer
+Viertelstunde. Ein DMARC-Eintrag auf `_dmarc.<subdomain>` mit
+`v=DMARC1; p=none;` verbessert die Zustellung bei Gmail und GMX spürbar.
+
+Danach in Supabase die *Sender email* auf eine Adresse dieser Domain umstellen,
+etwa `login@mail.deinprojekt.de`.
+
 ## 5. Starten
 
 ```bash
