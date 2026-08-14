@@ -40,8 +40,8 @@ nie in eine Datei, die der Browser sieht.
 ## 4. E-Mail-Vorlage auf Zahlencode umstellen
 
 Das ist der Schritt, den man leicht übersieht: Supabase verschickt
-standardmäßig einen **Magic Link**, die App erwartet aber einen sechsstelligen
-**Code**.
+standardmäßig einen **Magic Link**, die App erwartet aber einen
+Zahlen-**Code**.
 
 Unter **Authentication → Email Templates** müssen **zwei** Vorlagen ersetzt
 werden:
@@ -60,7 +60,7 @@ signup"; erst bei einem bestätigten Konto kommt „Magic Link" zum Zug. Wer nur
 letztere anpasst, bekommt weiterhin einen Link.
 
 Entscheidend ist in beiden die Variable `{{ .Token }}` — sie rendert den
-sechsstelligen Code. Achte auf den Punkt vor `Token`; `{{ .TokenHash }}` ist
+Zahlencode. Achte auf den Punkt vor `Token`; `{{ .TokenHash }}` ist
 etwas anderes und erzeugt eine unbrauchbare Zeichenkette.
 
 Beide Vorlagen kommen bewusst **ohne** `{{ .ConfirmationURL }}`, enthalten also

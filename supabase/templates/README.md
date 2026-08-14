@@ -25,7 +25,10 @@ bekommt bei jedem neuen Konto weiterhin einen Link.
 
 ## Die Variable
 
-Entscheidend ist `{{ .Token }}` — sie rendert den sechsstelligen Code.
+Entscheidend ist `{{ .Token }}` — sie rendert den Zahlencode. Wie lang der
+ist, stellt man unter *Authentication → Sign In / Providers → Email → Email OTP
+Length* ein; üblich sind 6 bis 10 Ziffern. Das Anmeldeformular akzeptiert jede
+Länge in diesem Bereich.
 
 Häufige Tippfehler, die alle einen Fehler beim Versand auslösen und als
 `HTTP 500 „Error sending confirmation email"` sichtbar werden:

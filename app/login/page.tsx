@@ -8,6 +8,15 @@ type Step = "choose" | "email" | "code";
 
 /** Supabase erlaubt pro Adresse nur alle 60 Sekunden einen neuen Code. */
 const RESEND_COOLDOWN = 60;
+
+/**
+ * Die Länge des Codes ist in Supabase konfigurierbar (Authentication →
+ * Sign In / Providers → Email → Email OTP Length), üblich sind 6 bis 10
+ * Ziffern. Deshalb hier keine feste Länge erwarten, sondern nur eine
+ * Untergrenze — sonst sperrt das Formular Codes aus, die gültig sind.
+ */
+const CODE_MIN_LENGTH = 6;
+const CODE_MAX_LENGTH = 10;
 const STORAGE_KEY = "pending-login-email";
 
 function readableError(error: unknown): string {
@@ -300,7 +309,7 @@ export default function LoginPage() {
               id="code"
               inputMode="numeric"
               pattern="[0-9]*"
-              maxLength={6}
+              maxLength={CODE_MAX_LENGTH}
               required
               autoFocus
               autoComplete="one-time-code"
@@ -308,11 +317,11 @@ export default function LoginPage() {
               onChange={(event) =>
                 setCode(event.target.value.replace(/\D/g, ""))
               }
-              className="mt-2 w-full rounded-lg border border-line bg-transparent px-4 py-3 font-mono text-lg tracking-[0.4em] outline-none transition-colors focus:border-accent"
+              className="mt-2 w-full rounded-lg border border-line bg-transparent px-4 py-3 text-center font-mono text-xl tracking-[0.35em] outline-none transition-colors focus:border-accent"
             />
             <button
               type="submit"
-              disabled={busy || code.length !== 6}
+              disabled={busy || code.length < CODE_MIN_LENGTH}
               className="mt-4 w-full rounded-lg bg-accent px-5 py-3.5 text-[0.95rem] font-medium text-paper transition-colors hover:bg-accent-strong disabled:opacity-50"
             >
               {busy ? "Wird geprüft …" : "Anmelden"}

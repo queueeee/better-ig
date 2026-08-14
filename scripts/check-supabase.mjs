@@ -216,7 +216,7 @@ console.log(
         "nicht sichtbar sind:",
         "",
         "  1. Enthält die Magic-Link-Vorlage {{ .Token }}? Ohne das kommt ein",
-        "     Link statt eines sechsstelligen Codes an.",
+        "     Link statt eines Zahlencodes an.",
         "  2. Steht die Relying Party ID auf localhost? Sie lässt sich später",
         "     nicht mehr ändern, ohne alle Passkeys ungültig zu machen.",
         "",
