@@ -138,12 +138,35 @@ if (mailArg !== -1) {
     );
     hint("solange dort keine eigene Domain verifiziert ist.");
 
-    const res = await fetch(`${base}/auth/v1/otp`, {
+    // Welche Vorlage greift, hängt am Kontozustand, nicht am Aufruf: Ein
+    // bestätigtes Konto bekommt "Magic Link", ein neues oder unbestätigtes
+    // bekommt "Confirm signup". Wer die falsche bearbeitet, sieht seine
+    // Änderung nie.
+    //
+    // Erst mit create_user=false anfragen: Existiert das Konto, geht die Mail
+    // sofort raus und wir wissen zugleich, welche Vorlage greift. Existiert es
+    // nicht, lehnt Supabase ohne Mailversand ab — dann erst der zweite Aufruf,
+    // sodass die 60-Sekunden-Sperre pro Adresse nicht unnötig ausgelöst wird.
+    let res = await fetch(`${base}/auth/v1/otp`, {
       method: "POST",
       headers: { apikey: key, "Content-Type": "application/json" },
-      body: JSON.stringify({ email: to, create_user: true }),
+      body: JSON.stringify({ email: to, create_user: false }),
     });
-    const body = await res.text();
+    let body = await res.text();
+
+    if (res.ok) {
+      ok("Konto existiert und ist bestätigt");
+      hint("→ Es greift die Vorlage „Magic Link\".");
+    } else if (body.includes("otp_disabled")) {
+      ok("Konto existiert noch nicht oder ist unbestätigt");
+      hint("→ Es greift die Vorlage „Confirm signup\".");
+      res = await fetch(`${base}/auth/v1/otp`, {
+        method: "POST",
+        headers: { apikey: key, "Content-Type": "application/json" },
+        body: JSON.stringify({ email: to, create_user: true }),
+      });
+      body = await res.text();
+    }
 
     if (res.ok) {
       ok("Supabase hat die Mail an den SMTP-Dienst übergeben");
@@ -155,6 +178,11 @@ if (mailArg !== -1) {
         msg = JSON.parse(body).msg ?? body;
       } catch {}
       fail(`Versand fehlgeschlagen (HTTP ${res.status}): ${msg}`);
+
+      if (res.status === 429) {
+        hint("Nur die Sperre von 60 Sekunden pro Adresse — kurz warten und");
+        hint("nochmal. Kein Konfigurationsfehler.");
+      }
 
       if (/sending (confirmation|magic link|recovery) email/i.test(msg)) {
         hint("Supabase konnte die Mail nicht an den SMTP-Dienst übergeben.");
