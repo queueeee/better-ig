@@ -1,0 +1,51 @@
+<!--
+  Vorlage für "Confirm signup" in Supabase.
+  Einzufügen unter: Authentication → Email Templates → Confirm signup
+
+  WARUM DIESE VORLAGE:
+  signInWithOtp heisst zwar "OTP", landet serverseitig aber im MagicLink-
+  Handler. Der behandelt einen Nutzer als neu, wenn er entweder nicht
+  existiert ODER existiert, aber noch unbestätigt ist — und verschickt dann
+  intern eine Signup-Mail. Für alle Erstanmeldungen greift deshalb DIESE
+  Vorlage, nicht "Magic Link". Wer nur die Magic-Link-Vorlage anpasst,
+  bekommt bei jedem neuen Konto weiterhin einen Link.
+
+  Erst wenn ein Konto bestätigt ist, kommen die Codes aus "Magic Link".
+  Beide Vorlagen müssen also {{ .Token }} enthalten.
+
+  Bewusst OHNE {{ .ConfirmationURL }}: Ein Link in einer Anmeldemail wird von
+  E-Mail-Scannern in Firmen- und Provider-Infrastruktur oft vorab abgerufen,
+  was den Einmal-Token verbraucht, bevor der Mensch ihn anklickt. Ein Code,
+  den man abtippt, hat dieses Problem nicht.
+-->
+<div style="margin:0;padding:32px 16px;background:#f1efec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <div style="max-width:420px;margin:0 auto;background:#fbfaf8;border:1px solid #e4e2de;border-radius:12px;padding:32px;">
+
+    <p style="margin:0;font-size:12px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:#2f5d50;">
+      Bilder
+    </p>
+
+    <h1 style="margin:12px 0 0;font-size:24px;line-height:1.25;font-weight:600;color:#16181d;">
+      Willkommen
+    </h1>
+
+    <p style="margin:12px 0 0;font-size:15px;line-height:1.6;color:#6e7076;">
+      Gib diesen Code in der App ein, um dein Konto zu bestätigen.
+    </p>
+
+    <p style="margin:24px 0;padding:16px;background:#f1efec;border-radius:8px;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:30px;font-weight:600;letter-spacing:0.28em;color:#16181d;">
+      {{ .Token }}
+    </p>
+
+    <p style="margin:0;font-size:14px;line-height:1.6;color:#6e7076;">
+      Der Code gilt eine Stunde und lässt sich nur einmal verwenden.
+      Danach meldest du dich ohne Passwort an — per Passkey direkt vom Gerät.
+    </p>
+
+    <p style="margin:24px 0 0;padding-top:20px;border-top:1px solid #e4e2de;font-size:13px;line-height:1.6;color:#6e7076;">
+      Du hast dich nicht angemeldet? Dann ignorier diese Nachricht — ohne den
+      Code entsteht kein Konto.
+    </p>
+
+  </div>
+</div>

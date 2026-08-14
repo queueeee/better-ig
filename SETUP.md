@@ -43,15 +43,34 @@ Das ist der Schritt, den man leicht übersieht: Supabase verschickt
 standardmäßig einen **Magic Link**, die App erwartet aber einen sechsstelligen
 **Code**.
 
-Unter **Authentication → Email Templates → Magic Link** den Inhalt von
-[`supabase/templates/magic-link.html`](supabase/templates/magic-link.html)
-einfügen und speichern.
+Unter **Authentication → Email Templates** müssen **zwei** Vorlagen ersetzt
+werden:
 
-Entscheidend ist die Variable `{{ .Token }}` — sie wird zum sechsstelligen Code.
-Ohne sie kommt eine Mail ohne Code an, und die Anmeldung per E-Mail funktioniert
-nicht.
+| Vorlage im Dashboard | Inhalt aus |
+|---|---|
+| **Confirm signup** | [`supabase/templates/confirm-signup.html`](supabase/templates/confirm-signup.html) |
+| **Magic Link** | [`supabase/templates/magic-link.html`](supabase/templates/magic-link.html) |
 
-Die Vorlage liegt im Repo, weil Dashboard-Inhalte sonst nirgends versioniert
+Beide zu ändern ist zwingend, und das ist die Stelle, an der fast jeder
+hängenbleibt: `signInWithOtp` heißt zwar „OTP", landet serverseitig aber im
+Magic-Link-Handler. Der behandelt einen Nutzer als neu, wenn er entweder nicht
+existiert **oder existiert, aber noch unbestätigt ist** — und verschickt in
+beiden Fällen eine *Signup*-Mail. Für jede Erstanmeldung greift also „Confirm
+signup"; erst bei einem bestätigten Konto kommt „Magic Link" zum Zug. Wer nur
+letztere anpasst, bekommt weiterhin einen Link.
+
+Entscheidend ist in beiden die Variable `{{ .Token }}` — sie rendert den
+sechsstelligen Code. Achte auf den Punkt vor `Token`; `{{ .TokenHash }}` ist
+etwas anderes und erzeugt eine unbrauchbare Zeichenkette.
+
+Beide Vorlagen kommen bewusst **ohne** `{{ .ConfirmationURL }}`, enthalten also
+keinen Link. Das ist kein Schönheitsentscheid: Ein Anmeldelink wird von
+E-Mail-Scannern in Firmen- und Provider-Infrastruktur häufig vorab abgerufen,
+was den Einmal-Token verbraucht, bevor ein Mensch ihn anklickt. Ein Code, den
+man abtippt, hat dieses Problem nicht — und die App braucht deshalb auch keinen
+Callback-Route-Handler.
+
+Die Vorlagen liegen im Repo, weil Dashboard-Inhalte sonst nirgends versioniert
 sind und bei einem neuen Projekt verloren gehen.
 
 ## 5. Starten

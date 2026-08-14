@@ -82,29 +82,28 @@ try {
       ok("E-Mail-Anmeldung aktiv");
     }
 
-    // Der Passkey-Status steht nicht zuverlässig in /settings. Statt zu raten:
-    // Endpunkt anstupsen und aus der Antwort ableiten, ob er existiert.
-    const probe = await fetch(`${base}/auth/v1/factors/passkey/authenticate`, {
-      method: "POST",
-      headers: { apikey: key, "Content-Type": "application/json" },
-      body: "{}",
-    });
-
-    if (probe.status === 404) {
-      console.log(
-        "  \x1b[33m?\x1b[0m Passkey-Endpunkt nicht gefunden — Pfad kann sich in der Beta geändert haben",
+    if (settings.passkeys_enabled === true) {
+      ok("Passkeys sind aktiviert");
+    } else if (settings.passkeys_enabled === false) {
+      fail(
+        "Passkeys sind im Projekt NICHT aktiviert",
+        "Dashboard → Authentication → Passkeys einschalten, RP ID: localhost, Origin: http://localhost:3000",
       );
-      hint("Prüf im Dashboard: Authentication → Passkeys ist eingeschaltet");
     } else {
-      const body = await probe.text();
-      if (body.includes("passkey_disabled")) {
-        fail(
-          "Passkeys sind im Projekt nicht aktiviert",
-          "Dashboard → Authentication → Passkeys einschalten, RP ID: localhost, Origin: http://localhost:3000",
-        );
-      } else {
-        ok("Passkeys sind aktiviert");
-      }
+      console.log(
+        "  \x1b[33m?\x1b[0m Passkey-Status nicht in der Antwort — Feldname kann sich geändert haben",
+      );
+      hint("Im Dashboard prüfen: Authentication → Passkeys");
+    }
+
+    if (settings.mailer_autoconfirm === false) {
+      hint(
+        "Hinweis: Neue Nutzer müssen ihre E-Mail bestätigen. Deren erste Mail",
+      );
+      hint(
+        "kommt aus der Vorlage „Confirm signup\", nicht aus „Magic Link\" —",
+      );
+      hint("beide brauchen {{ .Token }}, sonst kommt ein Link statt eines Codes.");
     }
   }
 } catch (err) {
@@ -129,4 +128,4 @@ console.log(
       ].join("\n"),
 );
 
-process.exit(failed ? 1 : 0);
+process.exitCode = failed ? 1 : 0;
