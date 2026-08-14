@@ -20,20 +20,27 @@
 
 const ENC = new TextEncoder();
 
+/**
+ * WebCrypto verlangt Puffer, die nachweislich nicht geteilt sind. Seit
+ * TypeScript 5.7 unterscheidet der Typ das, weshalb hier durchgehend die
+ * enge Form steht statt des blossen Uint8Array.
+ */
+type Bytes = Uint8Array<ArrayBuffer>;
+
 // ---------------------------------------------------------------------
 // Kodierung
 // ---------------------------------------------------------------------
 
-export function toBase64(bytes: ArrayBuffer | Uint8Array): string {
+export function toBase64(bytes: ArrayBuffer | Uint8Array<ArrayBufferLike>): string {
   const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   let binary = "";
   for (const byte of view) binary += String.fromCharCode(byte);
   return btoa(binary);
 }
 
-export function fromBase64(value: string): Uint8Array {
+export function fromBase64(value: string): Bytes {
   const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
+  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
@@ -93,19 +100,19 @@ export type Sealed = { iv: string; data: string };
  * Initialisierungsvektor bricht AES-GCM vollständig, und ein Zähler
  * überlebt weder mehrere Geräte noch einen zurückgesetzten Zustand.
  */
-export async function seal(key: CryptoKey, plain: Uint8Array): Promise<Sealed> {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
+export async function seal(key: CryptoKey, plain: Bytes): Promise<Sealed> {
+  const iv = crypto.getRandomValues(new Uint8Array(new ArrayBuffer(12)));
   const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plain);
   return { iv: toBase64(iv), data: toBase64(data) };
 }
 
-export async function open(key: CryptoKey, sealed: Sealed): Promise<Uint8Array> {
+export async function open(key: CryptoKey, sealed: Sealed): Promise<Bytes> {
   const plain = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: fromBase64(sealed.iv) },
     key,
     fromBase64(sealed.data),
   );
-  return new Uint8Array(plain);
+  return new Uint8Array(plain) as Bytes;
 }
 
 export async function generateContentKey(): Promise<CryptoKey> {
@@ -126,7 +133,7 @@ export async function generateContentKey(): Promise<CryptoKey> {
  * Stelle würde die andere mitreissen.
  */
 export async function deriveKeyFrom(
-  material: Uint8Array,
+  material: Bytes,
   zweck: string,
 ): Promise<CryptoKey> {
   const base = await crypto.subtle.importKey("raw", material, "HKDF", false, [
@@ -136,7 +143,7 @@ export async function deriveKeyFrom(
     {
       name: "HKDF",
       hash: "SHA-256",
-      salt: new Uint8Array(32),
+      salt: new Uint8Array(new ArrayBuffer(32)),
       info: ENC.encode(`bilder|v1|${zweck}`),
     },
     base,
@@ -149,7 +156,7 @@ export async function deriveKeyFrom(
 /** Aus der Wiederherstellungsphrase, absichtlich langsam. */
 export async function deriveKeyFromPhrase(
   phrase: string,
-  salt: Uint8Array,
+  salt: Bytes,
 ): Promise<CryptoKey> {
   const base = await crypto.subtle.importKey(
     "raw",
@@ -176,7 +183,7 @@ const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 /** Sechs Fünfergruppen, rund 150 Bit. */
 export function generateRecoveryPhrase(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(30));
+  const bytes = crypto.getRandomValues(new Uint8Array(new ArrayBuffer(30)));
   const zeichen = [...bytes].map((byte) => ALPHABET[byte % ALPHABET.length]);
   const gruppen: string[] = [];
   for (let i = 0; i < zeichen.length; i += 5) {
@@ -200,12 +207,12 @@ export function generateRecoveryPhrase(): string {
  * dass ein Passkey überall dasselbe ergibt.
  */
 export type PrfResult =
-  | { ok: true; material: Uint8Array }
+  | { ok: true; material: Bytes }
   | { ok: false; grund: "nicht-unterstuetzt" | "abgebrochen" | "fehler" };
 
 export async function evaluatePrf(
   options: PublicKeyCredentialRequestOptions,
-  salt: Uint8Array,
+  salt: Bytes,
 ): Promise<{ prf: PrfResult; credential: PublicKeyCredential | null }> {
   try {
     const credential = (await navigator.credentials.get({
