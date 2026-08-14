@@ -125,6 +125,34 @@ try {
       );
     }
 
+    const postsTable = await fetch(`${base}/rest/v1/posts?select=id&limit=1`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+
+    if (postsTable.status === 404) {
+      fail("Die Tabelle „posts\" fehlt");
+      hint("Dashboard → SQL Editor → Inhalt von");
+      hint("supabase/migrations/0002_posts.sql einfügen und Run klicken.");
+    } else if (postsTable.ok || [401, 403].includes(postsTable.status)) {
+      ok("Tabelle „posts\" vorhanden");
+    }
+
+    // Ein öffentlicher Bucket antwortet auf eine Anfrage nach einer nicht
+    // existierenden Datei mit 400/404 — fehlt der Bucket selbst, meldet
+    // Storage das ausdrücklich im Text.
+    const bucket = await fetch(
+      `${base}/storage/v1/object/public/posts/.probe`,
+      { headers: { apikey: key } },
+    );
+    const bucketBody = await bucket.text();
+
+    if (/bucket not found/i.test(bucketBody)) {
+      fail("Der Speicher-Bucket „posts\" fehlt");
+      hint("Er wird von derselben Migration 0002 mit angelegt.");
+    } else {
+      ok("Speicher-Bucket „posts\" vorhanden");
+    }
+
     if (settings.mailer_autoconfirm === false) {
       hint(
         "Hinweis: Neue Nutzer müssen ihre E-Mail bestätigen. Deren erste Mail",
