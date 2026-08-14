@@ -25,6 +25,17 @@ export type FeedPost = OwnPost & {
   likedByMe: boolean;
 };
 
+export type PublicProfile = {
+  id: string;
+  handle: string;
+  display_name: string | null;
+  postCount: number;
+  followerCount: number;
+  followingCount: number;
+  followedByMe: boolean;
+  isMe: boolean;
+};
+
 export type Comment = {
   id: string;
   body: string;
@@ -92,4 +103,12 @@ export function likeLabel(count: number): string {
 export function commentLabel(count: number): string {
   if (count === 0) return "Kommentieren";
   return count === 1 ? "1 Kommentar" : `${count} Kommentare`;
+}
+
+export function followerLabel(count: number): string {
+  return count === 1 ? "1 Follower" : `${count} Follower`;
+}
+
+export function postLabel(count: number): string {
+  return count === 1 ? "1 Bild" : `${count} Bilder`;
 }

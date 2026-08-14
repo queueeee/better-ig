@@ -1,7 +1,13 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import { readCount, type Comment, type FeedPost, type OwnPost } from "@/lib/post";
+import {
+  readCount,
+  type Comment,
+  type FeedPost,
+  type OwnPost,
+  type PublicProfile,
+} from "@/lib/post";
 
 export const FEED_PAGE_SIZE = 30;
 
@@ -56,15 +62,44 @@ function shape(raw: RawPost, liked: Set<string>): FeedPost {
   };
 }
 
-/** Die neuesten Beiträge samt Autor, Zählern und eigenem Like-Status. */
-export async function getFeed(limit = FEED_PAGE_SIZE): Promise<FeedPost[]> {
+/** IDs der Profile, denen der Nutzer folgt. */
+export async function getFollowingIds(userId: string): Promise<string[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("follows")
+    .select("following_id")
+    .eq("follower_id", userId);
+
+  if (error) return [];
+  return (data ?? []).map((row) => row.following_id as string);
+}
+
+/**
+ * Der Feed. Ohne `authorIds` alle Beiträge („Entdecken"), mit `authorIds`
+ * nur die dieser Profile.
+ *
+ * Die Einschränkung läuft über eine Liste von IDs statt über einen Join:
+ * Supabase empfiehlt dieses Muster ausdrücklich, weil Joins in Kombination
+ * mit Zugriffsregeln um Grössenordnungen langsamer werden können.
+ */
+export async function getFeed(
+  limit = FEED_PAGE_SIZE,
+  authorIds?: string[],
+): Promise<FeedPost[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("posts")
     .select(POST_FIELDS)
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  if (authorIds) {
+    if (authorIds.length === 0) return [];
+    query = query.in("author_id", authorIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     if (isMissingTable(error.code)) return [];
@@ -74,6 +109,55 @@ export async function getFeed(limit = FEED_PAGE_SIZE): Promise<FeedPost[]> {
   const raw = (data ?? []) as unknown as RawPost[];
   const liked = await likedPostIds(raw.map((post) => post.id));
   return raw.map((post) => shape(post, liked));
+}
+
+/** Öffentliches Profil samt Zählern und eigenem Folge-Status. */
+export async function getPublicProfile(
+  handle: string,
+  viewerId: string,
+): Promise<PublicProfile | null> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      "id, handle, display_name, posts(count), followers:follows!follows_following_id_fkey(count), following:follows!follows_follower_id_fkey(count)",
+    )
+    .eq("handle", handle)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingTable(error.code)) return null;
+    throw new Error(`Profil konnte nicht geladen werden: ${error.message}`);
+  }
+  if (!data) return null;
+
+  const raw = data as unknown as {
+    id: string;
+    handle: string;
+    display_name: string | null;
+    posts: unknown;
+    followers: unknown;
+    following: unknown;
+  };
+
+  const { data: followRow } = await supabase
+    .from("follows")
+    .select("following_id")
+    .eq("follower_id", viewerId)
+    .eq("following_id", raw.id)
+    .maybeSingle();
+
+  return {
+    id: raw.id,
+    handle: raw.handle,
+    display_name: raw.display_name,
+    postCount: readCount(raw.posts),
+    followerCount: readCount(raw.followers),
+    followingCount: readCount(raw.following),
+    followedByMe: Boolean(followRow),
+    isMe: raw.id === viewerId,
+  };
 }
 
 /** Ein einzelner Beitrag. */

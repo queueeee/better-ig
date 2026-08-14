@@ -98,3 +98,37 @@ export async function deleteComment(
   revalidatePath(`/p/${postId}`);
   return { ok: true };
 }
+
+export async function setFollow(
+  targetId: string,
+  following: boolean,
+): Promise<ActionResult> {
+  const session = await requireUser();
+  if (!session) return { ok: false, message: "Nicht angemeldet." };
+  const { supabase, userId } = session;
+
+  if (targetId === userId) {
+    return { ok: false, message: "Sich selbst zu folgen ergibt keinen Sinn." };
+  }
+
+  if (following) {
+    const { error } = await supabase
+      .from("follows")
+      .upsert(
+        { follower_id: userId, following_id: targetId },
+        { onConflict: "follower_id,following_id" },
+      );
+    if (error) return { ok: false, message: "Das Folgen hat nicht geklappt." };
+  } else {
+    const { error } = await supabase
+      .from("follows")
+      .delete()
+      .eq("follower_id", userId)
+      .eq("following_id", targetId);
+    if (error) return { ok: false, message: "Das Entfolgen hat nicht geklappt." };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/entdecken");
+  return { ok: true };
+}
