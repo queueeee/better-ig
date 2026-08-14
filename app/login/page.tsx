@@ -84,8 +84,16 @@ export default function LoginPage() {
   const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
+    // Auf Vercel-Vorschauen laufen wechselnde Adressen unter *.vercel.app.
+    // Die sind weder Subdomain der Relying Party ID noch selbst als solche
+    // brauchbar (vercel.app steht auf der Public Suffix List), also kann
+    // dort kein Passkey funktionieren — der Knopf bliebe eine Sackgasse.
+    const isPreview = process.env.NEXT_PUBLIC_VERCEL_ENV === "preview";
+
     setPasskeySupported(
-      typeof window !== "undefined" && !!window.PublicKeyCredential,
+      !isPreview &&
+        typeof window !== "undefined" &&
+        !!window.PublicKeyCredential,
     );
     // Nach einem Neuladen der Seite wäre die Adresse sonst weg und der
     // bereits verschickte Code nicht mehr einlösbar.
@@ -238,7 +246,9 @@ export default function LoginPage() {
 
             {!passkeySupported ? (
               <p className="mt-3 text-[0.85rem] leading-relaxed text-muted">
-                Dieser Browser unterstützt keine Passkeys. Nimm den E-Mail-Code.
+                {process.env.NEXT_PUBLIC_VERCEL_ENV === "preview"
+                  ? "In der Vorschau funktionieren Passkeys nicht. Nimm den E-Mail-Code."
+                  : "Dieser Browser unterstützt keine Passkeys. Nimm den E-Mail-Code."}
               </p>
             ) : null}
 

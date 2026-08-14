@@ -8,6 +8,8 @@ Next.js 16 · React 19 · Tailwind 4 · Supabase
 
 ## Einrichten
 
+Lokal: [SETUP.md](SETUP.md) · Online gehen: [DEPLOY.md](DEPLOY.md)
+
 Siehe [SETUP.md](SETUP.md) — Supabase-Projekt, Passkeys, Mailversand, Migrationen.
 Kurzfassung:
 
