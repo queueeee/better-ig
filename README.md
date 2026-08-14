@@ -60,7 +60,9 @@ verkleinern.
 | `app/login/` | Anmeldung per Passkey oder Code |
 | `app/willkommen/` | Namenswahl beim ersten Anmelden |
 | `app/hochladen/` | Bild auswählen, aufbereiten, veröffentlichen |
-| `app/profil/` | Profil und Passkey-Verwaltung |
+| `app/p/[id]/` | Einzelner Beitrag mit Kommentaren |
+| `app/profil/` | Profil, eigene Bilder, Passkey-Verwaltung |
+| `app/actions.ts` | Server Actions für Likes und Kommentare |
 | `supabase/migrations/` | Tabellen, Zugriffsregeln, Speicher-Bucket |
 | `supabase/templates/` | E-Mail-Vorlagen für das Dashboard |
 | `scripts/check-supabase.mjs` | Prüft die Einrichtung, testet den Mailversand |
@@ -73,9 +75,14 @@ Docker für die lokale Supabase-Umgebung installiert ist.
 Alles läuft über Row Level Security in der Datenbank, nicht über Prüfungen im
 Anwendungscode:
 
-- Profile und Beiträge dürfen alle Angemeldeten lesen
+- Profile, Beiträge, Likes und Kommentare dürfen alle Angemeldeten lesen
 - Schreiben und Löschen nur die eigene Zeile
+- Kommentare darf zusätzlich löschen, wem der Beitrag gehört
 - Im Bildspeicher darf jeder nur in seinen eigenen Ordner schreiben
+
+Bei Likes ist das Paar aus Beitrag und Nutzer der Primärschlüssel. Damit
+erzwingt die Datenbank, dass niemand zweimal dasselbe mag — Doppelklicks
+laufen ins Leere, statt Duplikate zu erzeugen.
 
 ## Zurückgestellt
 
