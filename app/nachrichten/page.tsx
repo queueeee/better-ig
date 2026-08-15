@@ -5,6 +5,8 @@ import { getUnterhaltungen, hatSchluesselServerseitig } from "@/lib/nachrichten"
 import { relativeTime } from "@/lib/post";
 import { SetupHinweis } from "@/app/setup-hinweis";
 import { Schluesselverwaltung } from "./schluessel";
+import { Kopfzeile } from "@/app/kopfzeile";
+import { getUngeleseneAnzahl } from "@/lib/benachrichtigungen";
 
 export default async function NachrichtenPage() {
   const result = await getOwnProfile();
@@ -13,27 +15,28 @@ export default async function NachrichtenPage() {
   if (result.status === "table-missing") return <SetupHinweis />;
   if (!result.profile) redirect("/willkommen");
 
-  const [unterhaltungen, hatKeys] = await Promise.all([
+  const [unterhaltungen, hatKeys, ungelesen] = await Promise.all([
     getUnterhaltungen(result.userId),
     hatSchluesselServerseitig(result.userId),
+    getUngeleseneAnzahl(result.userId),
   ]);
 
   return (
     <main className="mx-auto w-full max-w-xl flex-1 px-6 py-10">
-      <header className="flex items-center justify-between gap-4 border-b border-line pb-5">
-        <Link
-          href="/"
-          className="font-display text-[0.8rem] font-semibold uppercase tracking-[0.22em] text-accent"
-        >
-          Bilder
-        </Link>
-        <Link
-          href="/suche"
-          className="text-[0.85rem] text-muted underline decoration-line underline-offset-4 transition-colors hover:text-ink"
-        >
-          Jemanden anschreiben
-        </Link>
-      </header>
+      <Kopfzeile
+        handle={result.profile.handle}
+        userId={result.userId}
+        ungelesen={ungelesen}
+        variante="schmal"
+        kontext={
+          <Link
+            href="/suche"
+            className="text-muted underline decoration-line underline-offset-4 transition-colors hover:text-ink"
+          >
+            Jemanden anschreiben
+          </Link>
+        }
+      />
 
       {/* Ohne entsperrte Schluessel bleibt alles unlesbar — deshalb steht
           die Verwaltung hier oben statt versteckt in den Einstellungen. */}

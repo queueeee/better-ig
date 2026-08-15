@@ -13,6 +13,8 @@ import { SetupHinweis } from "@/app/setup-hinweis";
 import { FolgenKnopf } from "./folgen-knopf";
 import { SchreibenKnopf } from "./schreiben-knopf";
 import { createClient } from "@/lib/supabase/server";
+import { Kopfzeile } from "@/app/kopfzeile";
+import { getUngeleseneAnzahl } from "@/lib/benachrichtigungen";
 
 export default async function ProfilePage({
   params,
@@ -43,22 +45,24 @@ export default async function ProfilePage({
     .eq("user_id", profile.id)
     .maybeSingle();
 
+  const ungelesen = await getUngeleseneAnzahl(viewer.userId);
+
   return (
     <main className="mx-auto w-full max-w-xl flex-1 px-6 py-10">
-      <header className="flex items-center justify-between gap-4 border-b border-line pb-5">
-        <Link
-          href="/"
-          className="font-display text-[0.8rem] font-semibold uppercase tracking-[0.22em] text-accent"
-        >
-          Bilder
-        </Link>
-        <Link
-          href="/"
-          className="text-[0.85rem] text-muted underline decoration-line underline-offset-4 transition-colors hover:text-ink"
-        >
-          Zurück zum Feed
-        </Link>
-      </header>
+      <Kopfzeile
+        handle={viewer.profile.handle}
+        userId={viewer.userId}
+        ungelesen={ungelesen}
+        variante="schmal"
+        kontext={
+          <Link
+            href="/"
+            className="text-muted underline decoration-line underline-offset-4 transition-colors hover:text-ink"
+          >
+            Zurück zum Feed
+          </Link>
+        }
+      />
 
       <div className="mt-10 flex items-start justify-between gap-6">
         <div className="min-w-0">

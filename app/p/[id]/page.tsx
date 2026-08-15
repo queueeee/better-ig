@@ -8,6 +8,8 @@ import { SetupHinweis } from "@/app/setup-hinweis";
 import { LikeKnopf } from "@/app/like-knopf";
 import { Bildtext } from "@/app/bildtext";
 import { Kommentare } from "./kommentare";
+import { Kopfzeile } from "@/app/kopfzeile";
+import { getUngeleseneAnzahl } from "@/lib/benachrichtigungen";
 
 export default async function PostPage({
   params,
@@ -25,24 +27,27 @@ export default async function PostPage({
   const post = await getPost(id);
   if (!post) notFound();
 
-  const comments = await getComments(id);
+  const [comments, ungelesen] = await Promise.all([
+    getComments(id),
+    getUngeleseneAnzahl(result.userId),
+  ]);
 
   return (
     <main className="mx-auto w-full max-w-xl flex-1 px-6 py-10">
-      <header className="flex items-center justify-between gap-4 border-b border-line pb-5">
-        <Link
-          href="/"
-          className="font-display text-[0.8rem] font-semibold uppercase tracking-[0.22em] text-accent"
-        >
-          Bilder
-        </Link>
-        <Link
-          href="/"
-          className="text-[0.85rem] text-muted underline decoration-line underline-offset-4 transition-colors hover:text-ink"
-        >
-          Zurück zum Feed
-        </Link>
-      </header>
+      <Kopfzeile
+        handle={result.profile.handle}
+        userId={result.userId}
+        ungelesen={ungelesen}
+        variante="schmal"
+        kontext={
+          <Link
+            href="/"
+            className="text-muted underline decoration-line underline-offset-4 transition-colors hover:text-ink"
+          >
+            Zurück zum Feed
+          </Link>
+        }
+      />
 
       <article className="mt-8">
         <div className="flex items-baseline justify-between gap-4">
