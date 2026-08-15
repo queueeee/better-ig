@@ -1,6 +1,14 @@
 -- Migration 0010: Benachrichtigungen
 --
 -- Anwenden: Dashboard → SQL Editor → New query → Inhalt einfügen → Run.
+--
+-- Die Datei als GANZES einfügen, nicht abschnittsweise. Der SQL-Editor
+-- packt ein Skript in eine Transaktion; bricht etwas ab, rollt alles
+-- zurück und es bleibt kein halber Zustand übrig. Wer einzelne Blöcke
+-- herauskopiert, verliert genau diese Garantie.
+--
+-- Ein zweiter Lauf bricht sofort an der ersten create-table-Anweisung ab
+-- (42P07, Relation existiert bereits) und ändert nichts. Das ist gewollt.
 
 -- ---------------------------------------------------------------------
 -- Die Tabelle
@@ -56,6 +64,14 @@ create table public.notifications (
         follow_follower_id is not null
         and like_post_id is null and like_actor_id is null
         and comment_id is null
+      -- Ohne dieses else liefert das case bei einem unbekannten typ NULL,
+      -- und eine CHECK-Bedingung wertet NULL als ERFÜLLT. Heute kann das
+      -- nicht eintreten, weil die Bedingung an typ oben schon auf drei
+      -- Werte einschränkt. Wer aber später einen vierten Typ ergänzt und
+      -- nur jene Bedingung erweitert, hätte für ihn still gar keine
+      -- Formprüfung mehr — ohne Fehlermeldung, und nur an falschen Daten
+      -- erkennbar.
+      else false
     end
   )
 );
@@ -77,6 +93,31 @@ create index notifications_user_created_idx
 create index notifications_folgt_idx
   on public.notifications (user_id, follow_follower_id, created_at desc)
   where typ = 'folgt';
+
+-- Ein Index je kaskadierendem Fremdschlüssel. Postgres führt eine Kaskade
+-- als "delete from notifications where <spalte> = $1" aus, einmal pro
+-- gelöschter Elternzeile — ohne Index also je ein vollständiger Scan.
+--
+-- Das Zurücknehmen eines Likes ist der häufigste Schreibvorgang dieser
+-- App, und das Löschen eines Beitrags mit 300 Likes löst 300 solcher
+-- Kaskaden in EINER Transaktion aus. Supabase deckelt Anweisungen der
+-- Rolle authenticated bei acht Sekunden; ohne diese Indizes bricht
+-- irgendwann das Entliken selbst ab.
+--
+-- notifications_folgt_idx hilft dabei nicht: Die Kaskade fragt ohne
+-- "typ = 'folgt'" an, das Indexprädikat ist also nicht impliziert, und
+-- follow_follower_id steht dort nicht an erster Stelle.
+create index notifications_like_fk_idx
+  on public.notifications (like_post_id, like_actor_id)
+  where like_post_id is not null;
+
+create index notifications_comment_idx
+  on public.notifications (comment_id)
+  where comment_id is not null;
+
+create index notifications_follower_idx
+  on public.notifications (follow_follower_id)
+  where follow_follower_id is not null;
 
 -- ---------------------------------------------------------------------
 -- Zugriffsregeln
@@ -108,6 +149,18 @@ create policy "notifications_delete_own"
 -- security definer, weil die Zeile einem ANDEREN Nutzer gehört als dem,
 -- der sie auslöst — unter dessen Rechten verbietet die Regel oben das
 -- Einfügen.
+--
+-- Wichtig, damit niemand das falsch nachbaut: security definer umgeht die
+-- Zugriffsregeln NICHT von sich aus. Es wechselt nur auf den Eigentümer,
+-- hier postgres — und der ist von RLS ausgenommen, solange niemand
+-- "force row level security" setzt. Der Insert gelingt also wegen der
+-- EIGENTÜMERSCHAFT, nicht wegen security definer.
+--
+-- Daraus folgt eine Warnung: Ein "alter table public.notifications force
+-- row level security" sieht nach sinnvoller Härtung aus (die Tabelle hat
+-- ja keine insert-Regel) und würde alle drei Trigger sofort scheitern
+-- lassen — damit wären Liken, Kommentieren und Folgen kaputt. Bei
+-- notification_state bräche sogar die Profilanlage beim Registrieren.
 --
 -- search_path = '' statt = public: Bei "public" durchsucht Postgres
 -- pg_temp implizit zuerst, und eine untergeschobene Tabelle dort würde
@@ -211,6 +264,17 @@ create trigger follows_notify_trigger
   after insert on public.follows
   for each row execute function public.notify_folgt();
 
+-- Diese drei Funktionen behalten bewusst ihr implizites execute für
+-- PUBLIC, anders als die RPC-Funktionen weiter unten. Ausnutzbar ist es
+-- nicht: Eine Funktion mit Rückgabetyp trigger lässt sich nicht aus einem
+-- Ausdruck heraus aufrufen, und PostgREST nimmt sie gar nicht erst in
+-- seinen Schema-Cache auf.
+--
+-- Entzogen wird es trotzdem nicht, weil sich hier ohne laufende Datenbank
+-- nicht belegen liess, ob Postgres beim Auslösen eines Triggers das
+-- execute-Recht des AUSLÖSENDEN prüft. Täte es das, bräche ein revoke das
+-- Liken für alle — ein Risiko ohne Gegenwert.
+
 -- Bewusst ohne "exception when others then return new": Ein stiller
 -- Handler liesse Benachrichtigungen spurlos verschwinden, und in einer
 -- App ohne Testverzeichnis wäre das nicht zu finden. Der Preis ist, dass
@@ -237,15 +301,30 @@ create policy "notification_state_select_own"
   for select to authenticated
   using (user_id = (select auth.uid()));
 
+-- read_at <= now() ist die eigentliche Absicherung, nicht das Fehlen
+-- einer INSERT-Regel.
+--
+-- Ohne diese Klemme könnte jeder seine eigene Marke per PATCH auf
+-- 'infinity' setzen und hätte dauerhaft "alles gelesen". Das schadet nur
+-- ihm selbst — fremde Zeilen sind unerreichbar, und die Benachrichtigungen
+-- blieben lesbar —, aber es wäre ein Zustand, aus dem er ohne Hilfe nicht
+-- mehr herauskäme.
 create policy "notification_state_update_own"
   on public.notification_state
   for update to authenticated
   using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
+  with check (user_id = (select auth.uid()) and read_at <= now());
 
--- Kein insert: Die Zeile legt der Trigger unten an. Mit einer
--- INSERT-Regel könnte man sich die eigene Zeile vorab mit
--- read_at = 'infinity' anlegen und wäre dauerhaft "gelesen".
+-- Anlegen darf man nur die eigene Zeile, und nur mit einer Marke in der
+-- Vergangenheit. Im Normalfall braucht das niemand: Der Trigger unten legt
+-- sie beim Anlegen des Profils an. Die Regel ist der Notausgang, falls
+-- die Zeile doch einmal fehlt — ohne sie liefe benachrichtigungen_gelesen
+-- still ins Leere, die Glocke stünde dauerhaft auf ungelesen, und niemand
+-- könnte das reparieren.
+create policy "notification_state_insert_own"
+  on public.notification_state
+  for insert to authenticated
+  with check (user_id = (select auth.uid()) and read_at <= now());
 
 create or replace function public.notification_state_anlegen()
 returns trigger
@@ -283,15 +362,22 @@ on conflict (user_id) do nothing;
 -- verhält sich wie überall sonst. security definer wird hier nicht
 -- gebraucht — über PostgREST liesse sich nur greatest() nicht ausdrücken.
 
+-- Als Upsert und nicht als blosses Update: Fehlte die Zeile, träfe ein
+-- Update null Zeilen, PostgREST meldete trotzdem Erfolg, und die Glocke
+-- stünde von da an dauerhaft auf ungelesen — ein Fehler, aus dem sich der
+-- Nutzer nicht selbst befreien könnte. Der Trigger unten und der Backfill
+-- decken heute jedes Profil ab; das hier ist der Riegel dafür, dass eine
+-- Lücke in dieser Annahme keine Einbahnstrasse wird.
 create or replace function public.benachrichtigungen_gelesen(bis timestamptz)
 returns void
 language sql
 security invoker
 set search_path = ''
 as $$
-  update public.notification_state
-  set read_at = greatest(read_at, bis)
-  where user_id = (select auth.uid());
+  insert into public.notification_state (user_id, read_at)
+  values ((select auth.uid()), bis)
+  on conflict (user_id) do update
+  set read_at = greatest(notification_state.read_at, excluded.read_at);
 $$;
 
 revoke all on function public.benachrichtigungen_gelesen(timestamptz)
@@ -329,6 +415,11 @@ grant execute on function public.unterhaltung_gelesen(uuid, timestamptz)
 -- security invoker, damit die Regel messages_select_participant greift.
 -- Eigene Nachrichten zählen nicht mit — sonst erhöhte das Senden den
 -- eigenen Zähler.
+--
+-- greatest(last_read_at, joined_at) statt nur last_read_at: Die Lesemarke
+-- steht per Vorgabe auf 'epoch' (0007:57). Wer einer Gruppe mit 5000
+-- alten Nachrichten hinzugefügt wird, sähe sonst im selben Moment "5000"
+-- an der Glocke — für ein Gespräch, das er gerade erst betreten hat.
 create or replace function public.ungelesene_nachrichten()
 returns integer
 language sql
@@ -341,7 +432,7 @@ as $$
   join public.conversation_participants p
     on p.conversation_id = m.conversation_id
    and p.user_id = (select auth.uid())
-  where m.created_at > p.last_read_at
+  where m.created_at > greatest(p.last_read_at, p.joined_at)
     and m.sender_id <> (select auth.uid());
 $$;
 
