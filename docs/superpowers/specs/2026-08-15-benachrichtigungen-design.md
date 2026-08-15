@@ -360,7 +360,7 @@ Gruppenschlüssel ist `(typ, Bezug, Kalendertag)`:
 August mit „anna, ben und 46 weitere" nach oben, während die Glocke korrekt „+1"
 sagt.
 
-Höchstens drei Urheber werden namentlich genannt, der Rest wird gezählt.
+Höchstens zwei Urheber werden namentlich genannt, der Rest wird gezählt.
 
 ### `app/glocke.tsx` (neu, `"use client"`)
 
@@ -418,8 +418,10 @@ der Aktionszeile rechts, zwischen „Nachrichten" und „@handle".
   `kontext`-Element, das die Seite als zusätzlichen Link einhängt — damit
   überlebt etwa „Jemanden anschreiben" auf `/nachrichten`.
 
-Die schmale Variante ersetzt **sechs** handgebaute Kopfzeilen: `/p/[id]`,
-`/u/[handle]`, `/nachrichten`, `/nachrichten/[id]`, `/profil` und `/hochladen`.
+Die schmale Variante ersetzt **fünf** handgebaute Kopfzeilen: `/p/[id]`,
+`/u/[handle]`, `/nachrichten`, `/profil` und `/hochladen`. `/nachrichten/[id]`
+behält seine eigene Kopfzeile mit Rücklink und Gesprächstitel — dort kommt nur
+die Komponente `Gelesen` dazu, sonst nichts.
 
 Bei `/hochladen` verschwinden damit `items-baseline` und der fehlende
 `border-b` — beides war beiläufig, nicht beabsichtigt. Der grössere Abstand
@@ -486,7 +488,10 @@ Anpassung im Browser.
 4. Die sechs handgebauten Kopfzeilen durch die schmale Variante ersetzen
 5. `app/benachrichtigungen/page.tsx` und das Markieren als gelesen
 6. `unterhaltung_gelesen` in `/nachrichten/[id]` einhängen
-7. `supabase/testnutzer.sql`, README und SETUP nachziehen
+7. `supabase/testnutzer.sql` und README nachziehen
+
+Der ausgearbeitete Plan mit Code für jeden Schritt steht in
+`docs/superpowers/plans/2026-08-15-benachrichtigungen.md`.
 
 `npm run check` muss die neue Migration erkennen — das Skript prüft die
 Vollständigkeit der Einrichtung und braucht den neuen Tabellennamen.

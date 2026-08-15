@@ -65,6 +65,9 @@ verkleinern.
 | `app/p/[id]/` | Einzelner Beitrag mit Kommentaren |
 | `app/profil/` | Profil, eigene Bilder, Passkey-Verwaltung |
 | `app/actions.ts` | Server Actions für Likes und Kommentare |
+| `app/glocke.tsx` | Zähler an der Glocke, in Echtzeit |
+| `app/benachrichtigungen/` | Wer mag, kommentiert, folgt — zusammengefasst |
+| `lib/benachrichtigungen-gruppieren.ts` | Reine Gruppierungslogik, mit Tests |
 | `supabase/migrations/` | Tabellen, Zugriffsregeln, Speicher-Bucket |
 | `supabase/templates/` | E-Mail-Vorlagen für das Dashboard |
 | `scripts/check-supabase.mjs` | Prüft die Einrichtung, testet den Mailversand |
@@ -85,6 +88,22 @@ Anwendungscode:
 Bei Likes ist das Paar aus Beitrag und Nutzer der Primärschlüssel. Damit
 erzwingt die Datenbank, dass niemand zweimal dasselbe mag — Doppelklicks
 laufen ins Leere, statt Duplikate zu erzeugen.
+
+## Benachrichtigungen
+
+Eine Zeile pro Ereignis, zusammengefasst erst beim Anzeigen — nach Bezug und
+Kalendertag. Geschrieben werden sie von Triggern in der Datenbank, nicht vom
+Anwendungscode: Wer ein Like setzt, darf die Benachrichtigung des Empfängers
+nicht selbst schreiben dürfen.
+
+Die Zahl an der Glocke zählt Ereignisse, die Liste zeigt Gruppen. Fünf Likes
+auf dasselbe Bild ergeben also „5" oben und eine Zeile unten. Anders ginge es
+nicht, ohne bei jedem Ereignis den Server zu fragen.
+
+Direktnachrichten zählen mit, stehen aber nicht in der Liste — ihr Inhalt ist
+verschlüsselt, und in der Datenbank soll er auch nicht als Vorschau landen.
+
+Tests: `npm test` (Node führt TypeScript direkt aus, kein Testwerkzeug nötig).
 
 ## Zurückgestellt
 

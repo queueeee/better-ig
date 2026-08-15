@@ -34,3 +34,56 @@ on conflict (id) do nothing;
 -- AUFRÄUMEN, wenn nicht mehr gebraucht:
 --   delete from public.profiles where handle = 'testkonto';
 --   danach im Dashboard unter Authentication → Users das Konto löschen.
+
+-- ---------------------------------------------------------------------
+-- Ereignisse zum Auslösen von Benachrichtigungen
+-- ---------------------------------------------------------------------
+--
+-- Über die Oberfläche lässt sich mit einem Konto keine einzige
+-- Benachrichtigung auslösen: Die Trigger unterdrücken den Selbstfall.
+-- Hier geht es trotzdem, weil sie den Urheber aus NEW.* lesen und nicht
+-- aus auth.uid() — im SQL-Editor ist auth.uid() null.
+--
+-- Einzeln ausführen und dazwischen im Browser nachsehen.
+
+-- Das Testprofil mag deinen neuesten Beitrag.
+insert into public.likes (post_id, user_id)
+select po.id, tp.id
+from public.posts po
+cross join lateral (
+  select id from public.profiles
+  where id <> po.author_id
+  order by created_at desc limit 1
+) tp
+order by po.created_at desc
+limit 1
+on conflict do nothing;
+
+-- Das Testprofil kommentiert deinen neuesten Beitrag.
+insert into public.comments (post_id, author_id, body)
+select po.id, tp.id, 'Schönes Licht — wo war das?'
+from public.posts po
+cross join lateral (
+  select id from public.profiles
+  where id <> po.author_id
+  order by created_at desc limit 1
+) tp
+order by po.created_at desc
+limit 1;
+
+-- Das Testprofil folgt dir.
+insert into public.follows (follower_id, following_id)
+select tp.id, po.author_id
+from public.posts po
+cross join lateral (
+  select id from public.profiles
+  where id <> po.author_id
+  order by created_at desc limit 1
+) tp
+order by po.created_at desc
+limit 1
+on conflict do nothing;
+
+-- Zum Aufräumen:
+--   delete from public.notifications where user_id = auth.uid();
+-- (im SQL-Editor stattdessen die eigene Nutzer-ID einsetzen)

@@ -135,6 +135,7 @@ try {
       ["conversations", "0007_unterhaltungen.sql"],
       ["user_keys", "0008_schluessel.sql"],
       ["messages", "0009_nachrichten.sql"],
+      ["notifications", "0010_benachrichtigungen.sql"],
     ];
 
     // Migration 0005 legt keine Tabelle an, sondern Spalten — erkennbar
