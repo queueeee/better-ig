@@ -5,6 +5,7 @@ import { FEED_PAGE_SIZE, getFeed } from "@/lib/feed";
 import { SetupHinweis } from "@/app/setup-hinweis";
 import { Kopfzeile } from "@/app/kopfzeile";
 import { FeedListe } from "@/app/feed-liste";
+import { getUngeleseneAnzahl } from "@/lib/benachrichtigungen";
 
 export default async function EntdeckenPage() {
   const result = await getOwnProfile();
@@ -14,11 +15,19 @@ export default async function EntdeckenPage() {
   if (!result.profile) redirect("/willkommen");
 
   // Ohne Einschränkung auf Autoren: alles, was es gibt.
-  const posts = await getFeed();
+  const [posts, ungelesen] = await Promise.all([
+    getFeed(),
+    getUngeleseneAnzahl(result.userId),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-xl flex-1 px-6 py-10">
-      <Kopfzeile handle={result.profile.handle} active="entdecken" />
+      <Kopfzeile
+        handle={result.profile.handle}
+        userId={result.userId}
+        ungelesen={ungelesen}
+        active="entdecken"
+      />
 
       {posts.length === 0 ? (
         <section className="py-20 text-center">

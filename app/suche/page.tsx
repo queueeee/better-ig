@@ -12,6 +12,7 @@ import { SetupHinweis } from "@/app/setup-hinweis";
 import { Kopfzeile } from "@/app/kopfzeile";
 import { FeedListe } from "@/app/feed-liste";
 import { FolgenKnopf } from "@/app/u/[handle]/folgen-knopf";
+import { getUngeleseneAnzahl } from "@/lib/benachrichtigungen";
 
 type Reiter = "leute" | "beitraege";
 
@@ -30,10 +31,11 @@ export default async function SuchePage({
   const term = q?.trim() ?? "";
   const reiter: Reiter = was === "beitraege" ? "beitraege" : "leute";
 
-  const [profile, posts, tags] = await Promise.all([
+  const [profile, posts, tags, ungelesen] = await Promise.all([
     reiter === "leute" ? searchProfiles(term, result.userId) : [],
     reiter === "beitraege" ? searchPosts(term) : [],
     term ? [] : getTopHashtags(15),
+    getUngeleseneAnzahl(result.userId),
   ]);
 
   const reiterKlasse = (aktiv: boolean) =>
@@ -43,7 +45,12 @@ export default async function SuchePage({
 
   return (
     <div className="mx-auto w-full max-w-xl flex-1 px-6 py-10">
-      <Kopfzeile handle={result.profile.handle} active="suche" />
+      <Kopfzeile
+        handle={result.profile.handle}
+        userId={result.userId}
+        ungelesen={ungelesen}
+        active="suche"
+      />
 
       {/* Formular ohne JavaScript: Der Suchbegriff steht in der Adresse,
           damit sich ein Ergebnis teilen und zurücknavigieren lässt. */}

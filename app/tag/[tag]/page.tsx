@@ -5,6 +5,7 @@ import { getPostsByHashtag, FEED_PAGE_SIZE } from "@/lib/feed";
 import { SetupHinweis } from "@/app/setup-hinweis";
 import { Kopfzeile } from "@/app/kopfzeile";
 import { FeedListe } from "@/app/feed-liste";
+import { getUngeleseneAnzahl } from "@/lib/benachrichtigungen";
 
 export default async function TagPage({
   params,
@@ -19,11 +20,19 @@ export default async function TagPage({
   if (!result.profile) redirect("/willkommen");
 
   const decoded = decodeURIComponent(tag).toLowerCase();
-  const posts = await getPostsByHashtag(decoded);
+  const [posts, ungelesen] = await Promise.all([
+    getPostsByHashtag(decoded),
+    getUngeleseneAnzahl(result.userId),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-xl flex-1 px-6 py-10">
-      <Kopfzeile handle={result.profile.handle} active="suche" />
+      <Kopfzeile
+        handle={result.profile.handle}
+        userId={result.userId}
+        ungelesen={ungelesen}
+        active="suche"
+      />
 
       <h1 className="mt-8 font-display text-[2rem] leading-[1.1] font-semibold tracking-tight">
         <span className="text-accent">#</span>

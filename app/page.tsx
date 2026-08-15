@@ -10,6 +10,7 @@ import { SetupHinweis } from "@/app/setup-hinweis";
 import { StoryLeiste } from "@/app/story-leiste";
 import { Kopfzeile } from "@/app/kopfzeile";
 import { FeedListe } from "@/app/feed-liste";
+import { getUngeleseneAnzahl } from "@/lib/benachrichtigungen";
 
 export default async function FeedPage() {
   const result = await getOwnProfile();
@@ -28,14 +29,20 @@ export default async function FeedPage() {
   // Dateien löschen zu dürfen — den soll diese App nirgends halten.
   await cleanupOwnExpiredStories();
 
-  const [posts, stories] = await Promise.all([
+  const [posts, stories, ungelesen] = await Promise.all([
     getFeed(30, sichtbar),
     getStories(result.userId, sichtbar),
+    getUngeleseneAnzahl(result.userId),
   ]);
 
   return (
     <div className="mx-auto w-full max-w-xl flex-1 px-6 py-10">
-      <Kopfzeile handle={result.profile.handle} active="feed" />
+      <Kopfzeile
+        handle={result.profile.handle}
+        userId={result.userId}
+        ungelesen={ungelesen}
+        active="feed"
+      />
 
       <StoryLeiste gruppen={stories} />
 
