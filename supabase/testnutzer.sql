@@ -12,17 +12,36 @@
 --   Authentication → Users → „Add user" → „Create new user"
 --   E-Mail: test@example.com, irgendein Passwort
 --   Haken bei „Auto Confirm User" setzen
---   Danach die angezeigte User-ID (UUID) kopieren.
 
--- SCHRITT 2 — Profil dazu anlegen. UUID unten einsetzen:
+-- SCHRITT 2 — Diese Datei im SQL-Editor ausführen. Nichts anzupassen.
 
+-- Erst nachsehen, ob Schritt 1 erledigt ist. Ohne diese Prüfung scheitert
+-- das Einfügen unten am Fremdschlüssel profiles_id_fkey — mit einer
+-- Meldung, die nicht verrät, was zu tun ist.
+do $$
+begin
+  if not exists (
+    select 1 from auth.users where email = 'test@example.com'
+  ) then
+    -- Eine einzige Zeichenkette über mehrere Zeilen, nicht mehrere
+    -- aneinandergereihte: RAISE erwartet ein Literal, keinen Ausdruck.
+    raise exception 'Kein Konto mit test@example.com gefunden.
+Erst Schritt 1 erledigen: Dashboard → Authentication → Users → „Add user"
+→ „Create new user", E-Mail test@example.com, Haken bei „Auto Confirm User".
+Danach diese Datei nochmal ausführen.';
+  end if;
+end
+$$;
+
+-- Die User-ID wird nachgeschlagen statt abgetippt. Der SQL-Editor läuft als
+-- postgres und darf auth.users lesen; damit entfällt der Schritt, bei dem
+-- man eine UUID von Hand herüberkopiert — und mit ihm die Möglichkeit, ihn
+-- zu vergessen.
 insert into public.profiles (id, handle, display_name)
-values (
-  '00000000-0000-0000-0000-000000000000',  -- ← User-ID aus Schritt 1
-  'testkonto',
-  'Testkonto'
-)
-on conflict (id) do nothing;
+select id, 'testkonto', 'Testkonto'
+from auth.users
+where email = 'test@example.com'
+on conflict do nothing;
 
 -- SCHRITT 3 — Im Browser /u/testkonto aufrufen und auf „Folgen" klicken.
 -- Danach zeigt der Hauptfeed, was dieses Profil hochlädt.
@@ -84,6 +103,21 @@ order by po.created_at desc
 limit 1
 on conflict do nothing;
 
--- Zum Aufräumen:
---   delete from public.notifications where user_id = auth.uid();
--- (im SQL-Editor stattdessen die eigene Nutzer-ID einsetzen)
+-- ZUM AUFRÄUMEN. Es genügt, die Ereignisse des Testkontos zu löschen —
+-- die Benachrichtigungen verschwinden von selbst mit, weil sie per
+-- Fremdschlüssel an ihnen hängen. Das ist zugleich die einfachste Probe,
+-- dass die Kaskade wirklich greift: Vorher zählen, löschen, nachzählen.
+--
+--   select count(*) from public.notifications;
+--
+--   delete from public.likes l    using public.profiles p
+--     where l.user_id   = p.id and p.handle = 'testkonto';
+--   delete from public.comments c using public.profiles p
+--     where c.author_id = p.id and p.handle = 'testkonto';
+--   delete from public.follows f  using public.profiles p
+--     where f.follower_id = p.id and p.handle = 'testkonto';
+--
+--   select count(*) from public.notifications;   -- muss 0 sein
+--
+-- auth.uid() ist im SQL-Editor null — eine Bedingung darauf trifft dort
+-- nie zu und löscht lautlos nichts.
