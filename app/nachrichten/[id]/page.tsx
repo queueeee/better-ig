@@ -4,6 +4,7 @@ import { getOwnProfile } from "@/lib/profile";
 import { getNachrichten, getTeilnehmer } from "@/lib/nachrichten";
 import { SetupHinweis } from "@/app/setup-hinweis";
 import { Chat } from "./chat";
+import { Gelesen } from "./gelesen";
 
 export default async function ChatPage({
   params,
@@ -38,6 +39,11 @@ export default async function ChatPage({
         </Link>
         <p className="truncate text-[0.9rem] font-medium">{titel}</p>
       </header>
+
+      <Gelesen
+        conversationId={id}
+        bis={nachrichten[nachrichten.length - 1]?.createdAt ?? null}
+      />
 
       <Chat
         conversationId={id}
