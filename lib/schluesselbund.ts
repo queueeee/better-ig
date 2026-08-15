@@ -42,6 +42,12 @@ export function istEntsperrt() {
 
 export function vergessen() {
   offen = null;
+  // Ohne das blieben die geöffneten Unterhaltungsschlüssel im Speicher
+  // liegen und liessen sich weiter benutzen — ein Sperren-Knopf, der
+  // sichtbar sperrt, ohne zu sperren. Zugleich der Grund, warum der
+  // Zwischenspeicher beim Entsperren geleert wird: Nach einem Kontowechsel
+  // im selben Tab gehörten die Einträge sonst zur falschen Person.
+  zwischenspeicher.clear();
 }
 
 /** Das Bündel als Bytes, um es verschlüsselt abzulegen. */
@@ -136,6 +142,7 @@ export async function einrichten(userId: string): Promise<{
   const prfVerfuegbar = await zusaetzlichPerPasskeySichern(userId, roh);
 
   offen = bund;
+  zwischenspeicher.clear();
   return { phrase, prfVerfuegbar };
 }
 
@@ -200,6 +207,7 @@ export async function entsperrenMitPasskey(): Promise<boolean> {
     const wrapKey = await deriveKeyFrom(prf.material, "wrap-identity");
     const roh = await open(wrapKey, { iv: row.iv, data: row.data });
     offen = await entpacken(roh);
+    zwischenspeicher.clear();
     return true;
   } catch {
     return false;
@@ -222,6 +230,7 @@ export async function entsperrenMitPhrase(phrase: string): Promise<boolean> {
     const key = await deriveKeyFromPhrase(phrase, fromBase64(row.salt));
     const roh = await open(key, { iv: row.iv, data: row.data });
     offen = await entpacken(roh);
+    zwischenspeicher.clear();
     return true;
   } catch {
     return false;
@@ -245,12 +254,35 @@ export async function hatSchluessel(userId: string): Promise<boolean> {
 
 const zwischenspeicher = new Map<
   string,
-  { key: CryptoKey; geprueft: boolean }
+  { key: CryptoKey; herkunft: Herkunft }
 >();
 
+/**
+ * Wie gut ist belegt, woher der Schlüssel stammt?
+ *
+ * Die Sicherheitsgrenze ist NICHT die Unterschrift, sondern die Frage, ob
+ * der Absender überhaupt zu dieser Unterhaltung gehört. Wer im dm_key
+ * steht, ist ohnehin Mitleser — von ihm eine ungültige Unterschrift zu
+ * bekommen bringt ihm nichts, was er nicht schon hätte.
+ *
+ * Deshalb führt eine nicht nachrechenbare Unterschrift zu „unpruefbar"
+ * und nicht zur Ablehnung. Andernfalls zerstörte jede Schlüsselerneuerung
+ * — die 0008:40-43 ausdrücklich vorsieht — die betroffenen Unterhaltungen
+ * endgültig: conversation_keys kennt kein Update, der Primärschlüssel
+ * verhindert eine zweite Zeile, und der Schreiben-Knopf legt keinen
+ * zweiten Schlüssel an. Es gäbe keinen Weg zurück.
+ */
+export type Herkunft =
+  /** Unterschrift geprüft, Absender gehört zur Unterhaltung. */
+  | "belegt"
+  /** Zeile von vor Migration 0013 — trägt gar keine Unterschrift. */
+  | "altbestand"
+  /** Unterschrift vorhanden, aber nicht nachrechenbar. */
+  | "unpruefbar";
+
 export type SchluesselErgebnis =
-  /** Schlüssel liegt vor. `geprueft` sagt, ob seine Herkunft belegt ist. */
-  | { status: "offen"; key: CryptoKey; geprueft: boolean }
+  /** Schlüssel liegt vor. `herkunft` sagt, wie gut das belegt ist. */
+  | { status: "offen"; key: CryptoKey; herkunft: Herkunft }
   /** Für diese Unterhaltung wurde noch kein Schlüssel abgelegt. */
   | { status: "keiner" }
   /** Der Schlüsselbund ist gesperrt — erst entsperren. */
@@ -311,26 +343,29 @@ async function berechtigteAbsender(
 
   if (!conv) return null;
 
-  if (!conv.is_group) {
-    const teile = String(conv.dm_key ?? "").split(":");
-    return teile.length === 2 ? new Set(teile) : null;
-  }
+  // Für Gruppen gibt es keinen Anker. Auf die Teilnehmerliste
+  // zurückzufallen wäre schlimmer als nichts: Sie liesse einen
+  // untergeschobenen Schlüssel als „belegt" durchgehen und bescheinigte
+  // damit genau das, was hier verhindert werden soll. Lieber ablehnen —
+  // Gruppen lassen sich seit 0012 ohnehin nicht mehr anlegen, und wer
+  // ihnen eine Oberfläche gibt, muss diese Frage vorher beantworten.
+  if (conv.is_group) return null;
 
-  const { data: rows } = await supabase
-    .from("conversation_participants")
-    .select("user_id")
-    .eq("conversation_id", conversationId);
-
-  return new Set((rows ?? []).map((row) => row.user_id as string));
+  const teile = String(conv.dm_key ?? "").split(":");
+  return teile.length === 2 ? new Set(teile) : null;
 }
 
 /** Öffnet den Schlüssel einer Unterhaltung und prüft seine Herkunft. */
 export async function unterhaltungsschluessel(
   conversationId: string,
 ): Promise<SchluesselErgebnis> {
+  // Die Sperre zuerst, dann erst der Zwischenspeicher — umgekehrt lieferte
+  // ein gesperrter Bund weiterhin Schlüssel aus, die vor dem Sperren
+  // geöffnet wurden.
+  if (!offen) return { status: "gesperrt" };
+
   const gemerkt = zwischenspeicher.get(conversationId);
   if (gemerkt) return { status: "offen", ...gemerkt };
-  if (!offen) return { status: "gesperrt" };
 
   const supabase = createClient();
   const { data: row } = await supabase
@@ -343,29 +378,33 @@ export async function unterhaltungsschluessel(
 
   // Erst die Herkunft klären, dann erst entschlüsseln. Ein Schlüssel
   // falscher Herkunft soll gar nicht erst in den Zwischenspeicher geraten.
-  let geprueft = false;
-
   const absenderId = typeof row.sender_id === "string" ? row.sender_id : null;
   const unterschrift =
     typeof row.signature === "string" && row.signature.length > 0
       ? row.signature
       : null;
 
-  // Beide fehlen: Altbestand von vor Migration 0013. Nur EINES fehlt: Das
-  // kann kein Altbestand sein, denn die Bedingung
-  // conversation_keys_herkunft_paarweise lässt das gar nicht zu. Also
-  // wurde daran gedreht — und dann ist Ablehnen die einzige richtige
-  // Antwort. Auf Wahrheitswerte statt auf null zu prüfen wäre hier ein
-  // Fehler: Eine leere Zeichenkette ist nicht null, aber falsy, und diese
-  // Zeile liefe dann als „Altbestand" durch.
-  if ((absenderId === null) !== (unterschrift === null)) {
+  // Auf null prüfen, nicht auf Wahrheitswerte: Eine leere Zeichenkette ist
+  // nicht null, aber falsy, und diese Zeile liefe dann als Altbestand durch.
+  let herkunft: Herkunft = "unpruefbar";
+
+  if (absenderId === null && unterschrift === null) {
+    // Beides fehlt: Zeile von vor 0013.
+    herkunft = "altbestand";
+  } else if (absenderId !== null && unterschrift === null) {
+    // Absender ohne Unterschrift. Die Bedingung conversation_keys_herkunft
+    // lässt das nicht zu — hier wurde also gedreht.
     return {
       status: "abgelehnt",
-      grund: "Dem Schlüssel fehlt entweder der Absender oder die Unterschrift.",
+      grund: "Der Schlüssel nennt einen Absender, trägt aber keine Unterschrift.",
     };
-  }
-
-  if (absenderId && unterschrift) {
+  } else if (absenderId === null && unterschrift !== null) {
+    // Unterschrift ohne Absender: der Zustand nach einer Kontolöschung.
+    // Die Unterschrift bleibt, nur nachrechnen kann sie niemand mehr.
+    herkunft = "unpruefbar";
+  } else if (absenderId && unterschrift) {
+    // Das ist die Sicherheitsgrenze, und zwar die einzige harte: Wer nicht
+    // zur Unterhaltung gehört, hat hier gar nichts abzulegen.
     const erlaubt = await berechtigteAbsender(conversationId);
     if (!erlaubt || !erlaubt.has(absenderId)) {
       return {
@@ -382,15 +421,16 @@ export async function unterhaltungsschluessel(
       .maybeSingle();
 
     if (!absender) {
-      // Der Absender hat seine Schlüssel erneuert oder gelöscht (0008
-      // erlaubt das ausdrücklich). Kein Angriff, aber auch kein Beleg.
-      geprueft = false;
+      // Der Absender hat seine Schlüssel gelöscht (0008:44-47 erlaubt das
+      // ausdrücklich). Kein Angriff, aber auch kein Beleg.
+      herkunft = "unpruefbar";
     } else {
+      let stimmt = false;
       try {
         const pub = await importSigningPublicKey(
           absender.signing_public_key as string,
         );
-        geprueft = await crypto.subtle.verify(
+        stimmt = await crypto.subtle.verify(
           { name: "ECDSA", hash: "SHA-256" },
           pub,
           fromBase64(unterschrift),
@@ -406,15 +446,15 @@ export async function unterhaltungsschluessel(
           ),
         );
       } catch {
-        geprueft = false;
+        stimmt = false;
       }
 
-      if (!geprueft) {
-        return {
-          status: "abgelehnt",
-          grund: "Die Unterschrift unter dem Schlüssel stimmt nicht.",
-        };
-      }
+      // Stimmt sie nicht, hat der Absender seit dem Ablegen neue Schlüssel
+      // eingerichtet — oder jemand hat an der Zeile gedreht. Beides ist
+      // hier NICHT der Grund abzulehnen: Der Absender gehört zur
+      // Unterhaltung, er liest ohnehin mit. Abzulehnen kostete dagegen die
+      // ganze Unterhaltung, unwiderruflich.
+      herkunft = stimmt ? "belegt" : "unpruefbar";
     }
   }
 
@@ -435,10 +475,17 @@ export async function unterhaltungsschluessel(
       false,
       ["encrypt", "decrypt"],
     );
-    zwischenspeicher.set(conversationId, { key, geprueft });
-    return { status: "offen", key, geprueft };
+    zwischenspeicher.set(conversationId, { key, herkunft });
+    return { status: "offen", key, herkunft };
   } catch {
-    return { status: "keiner" };
+    // Der Schlüssel ist da, lässt sich aber nicht öffnen — er ist nicht
+    // für diesen Empfänger verschlüsselt. „keiner" wäre hier falsch: Der
+    // Schreiben-Knopf legte daraufhin einen neuen an und liefe in den
+    // Primärschlüssel.
+    return {
+      status: "abgelehnt",
+      grund: "Der Schlüssel dieser Unterhaltung lässt sich nicht öffnen.",
+    };
   }
 }
 

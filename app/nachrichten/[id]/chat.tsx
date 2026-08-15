@@ -83,14 +83,21 @@ export function Chat({ conversationId, userId, teilnehmer, anfang }: Props) {
 
       if (ergebnis.status === "abgelehnt") {
         setSchluessel({ art: "fehler", text: ergebnis.grund });
-      } else if (ergebnis.status === "offen" && !ergebnis.geprueft) {
+      } else if (ergebnis.status === "offen" && ergebnis.herkunft === "altbestand") {
         setSchluessel({
           art: "warnung",
           text:
-            "Der Schlüssel dieser Unterhaltung trägt keine überprüfbare " +
-            "Unterschrift. Er stammt aus der Zeit, bevor die App eine " +
-            "verlangt hat. Lesbar bleibt alles — belegt ist seine Herkunft " +
-            "aber nicht.",
+            "Der Schlüssel dieser Unterhaltung trägt keine Unterschrift. Er " +
+            "stammt aus der Zeit, bevor die App eine verlangt hat. Lesbar " +
+            "bleibt alles — belegt ist seine Herkunft aber nicht.",
+        });
+      } else if (ergebnis.status === "offen" && ergebnis.herkunft === "unpruefbar") {
+        setSchluessel({
+          art: "warnung",
+          text:
+            "Die Herkunft des Schlüssels lässt sich nicht mehr nachrechnen — " +
+            "wer ihn abgelegt hat, hat seither seine Schlüssel gewechselt " +
+            "oder sein Konto gelöscht. Lesbar bleibt alles.",
         });
       } else {
         setSchluessel(null);
