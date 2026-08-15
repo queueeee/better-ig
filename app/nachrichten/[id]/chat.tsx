@@ -7,6 +7,7 @@ import {
   istEntsperrt,
   nachrichtEntschluesseln,
   nachrichtVerschluesseln,
+  unterhaltungsschluessel,
 } from "@/lib/schluesselbund";
 import type { RohNachricht, Teilnehmer } from "@/lib/nachrichten";
 
@@ -30,6 +31,9 @@ export function Chat({ conversationId, userId, teilnehmer, anfang }: Props) {
   const [eingabe, setEingabe] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
   const [sendet, setSendet] = useState(false);
+  const [schluessel, setSchluessel] = useState<
+    { art: "warnung" | "fehler"; text: string } | null
+  >(null);
   const ende = useRef<HTMLDivElement>(null);
 
   const schluesselVon = useCallback(
@@ -64,6 +68,38 @@ export function Chat({ conversationId, userId, teilnehmer, anfang }: Props) {
     },
     [conversationId, schluesselVon],
   );
+
+  // Woher stammt der Schlüssel dieser Unterhaltung?
+  //
+  // Das gehört sichtbar an den Anfang des Gesprächs und nicht in die
+  // Konsole: Ein untergeschobener Schlüssel sieht im Betrieb aus wie ein
+  // richtiger — beide Seiten schreiben munter weiter, nur eben für
+  // jemand anderen mit. Wenn die App das merkt, muss sie es sagen.
+  useEffect(() => {
+    let abgebrochen = false;
+    (async () => {
+      const ergebnis = await unterhaltungsschluessel(conversationId);
+      if (abgebrochen) return;
+
+      if (ergebnis.status === "abgelehnt") {
+        setSchluessel({ art: "fehler", text: ergebnis.grund });
+      } else if (ergebnis.status === "offen" && !ergebnis.geprueft) {
+        setSchluessel({
+          art: "warnung",
+          text:
+            "Der Schlüssel dieser Unterhaltung trägt keine überprüfbare " +
+            "Unterschrift. Er stammt aus der Zeit, bevor die App eine " +
+            "verlangt hat. Lesbar bleibt alles — belegt ist seine Herkunft " +
+            "aber nicht.",
+        });
+      } else {
+        setSchluessel(null);
+      }
+    })();
+    return () => {
+      abgebrochen = true;
+    };
+  }, [conversationId]);
 
   // Vorhandene Nachrichten öffnen.
   useEffect(() => {
@@ -165,6 +201,19 @@ export function Chat({ conversationId, userId, teilnehmer, anfang }: Props) {
 
   return (
     <>
+      {schluessel ? (
+        <p
+          role={schluessel.art === "fehler" ? "alert" : undefined}
+          className={
+            schluessel.art === "fehler"
+              ? "mt-6 border-l-2 border-danger pl-3 text-[0.85rem] leading-relaxed text-danger"
+              : "mt-6 border-l-2 border-line pl-3 text-[0.85rem] leading-relaxed text-muted"
+          }
+        >
+          {schluessel.text}
+        </p>
+      ) : null}
+
       <div className="mt-6 flex-1 space-y-4">
         {nachrichten.length === 0 ? (
           <p className="py-10 text-center text-[0.9rem] text-muted">

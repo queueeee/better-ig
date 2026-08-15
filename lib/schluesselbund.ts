@@ -243,24 +243,180 @@ export async function hatSchluessel(userId: string): Promise<boolean> {
 // Unterhaltungsschlüssel
 // ---------------------------------------------------------------------
 
-const zwischenspeicher = new Map<string, CryptoKey>();
+const zwischenspeicher = new Map<
+  string,
+  { key: CryptoKey; geprueft: boolean }
+>();
 
-/** Öffnet den Schlüssel einer Unterhaltung. */
+export type SchluesselErgebnis =
+  /** Schlüssel liegt vor. `geprueft` sagt, ob seine Herkunft belegt ist. */
+  | { status: "offen"; key: CryptoKey; geprueft: boolean }
+  /** Für diese Unterhaltung wurde noch kein Schlüssel abgelegt. */
+  | { status: "keiner" }
+  /** Der Schlüsselbund ist gesperrt — erst entsperren. */
+  | { status: "gesperrt" }
+  /** Die Herkunft ist nachweislich falsch. Nicht benutzen. */
+  | { status: "abgelehnt"; grund: string };
+
+/**
+ * Der zu unterschreibende Text einer Schlüsselzeile.
+ *
+ * Unterschrieben wird über alles, was die Zeile ausmacht: In welcher
+ * Unterhaltung sie liegt, von wem sie kommt, FÜR WEN sie ist, und das
+ * Chiffrat selbst. Ohne den Empfänger liesse sich eine gültig
+ * unterschriebene Zeile auf einen anderen Empfänger umschreiben, ohne die
+ * Unterhaltung in eine andere verschieben.
+ */
+function schluesselKlartext(e: {
+  conversationId: string;
+  senderId: string;
+  empfaengerId: string;
+  ephemeralPublicKey: string;
+  iv: string;
+  data: string;
+}) {
+  return [
+    e.conversationId,
+    e.senderId,
+    e.empfaengerId,
+    e.ephemeralPublicKey,
+    e.iv,
+    e.data,
+  ].join("|");
+}
+
+/**
+ * Wer darf in dieser Unterhaltung einen Schlüssel abgelegt haben?
+ *
+ * Bei einem Zweiergespräch stehen die beiden Beteiligten im dm_key, und
+ * der ist unveränderlich: conversations kennt weder eine UPDATE- noch eine
+ * DELETE-Regel. Die Teilnehmerliste taugt als Anker NICHT — in sie lässt
+ * sich schreiben, und genau das wäre der Angriff.
+ *
+ * Für Gruppen gibt es keinen solchen Anker; dort bleibt nur die
+ * Teilnehmerliste. Das ist schwächer und hier ausdrücklich vermerkt —
+ * Gruppen haben noch keine Oberfläche, und wer eine baut, muss sich diese
+ * Frage vorher stellen.
+ */
+async function berechtigteAbsender(
+  conversationId: string,
+): Promise<Set<string> | null> {
+  const supabase = createClient();
+
+  const { data: conv } = await supabase
+    .from("conversations")
+    .select("is_group, dm_key")
+    .eq("id", conversationId)
+    .maybeSingle();
+
+  if (!conv) return null;
+
+  if (!conv.is_group) {
+    const teile = String(conv.dm_key ?? "").split(":");
+    return teile.length === 2 ? new Set(teile) : null;
+  }
+
+  const { data: rows } = await supabase
+    .from("conversation_participants")
+    .select("user_id")
+    .eq("conversation_id", conversationId);
+
+  return new Set((rows ?? []).map((row) => row.user_id as string));
+}
+
+/** Öffnet den Schlüssel einer Unterhaltung und prüft seine Herkunft. */
 export async function unterhaltungsschluessel(
   conversationId: string,
-): Promise<CryptoKey | null> {
+): Promise<SchluesselErgebnis> {
   const gemerkt = zwischenspeicher.get(conversationId);
-  if (gemerkt) return gemerkt;
-  if (!offen) return null;
+  if (gemerkt) return { status: "offen", ...gemerkt };
+  if (!offen) return { status: "gesperrt" };
 
   const supabase = createClient();
   const { data: row } = await supabase
     .from("conversation_keys")
-    .select("ephemeral_public_key, iv, data")
+    .select("user_id, sender_id, signature, ephemeral_public_key, iv, data")
     .eq("conversation_id", conversationId)
     .maybeSingle();
 
-  if (!row) return null;
+  if (!row) return { status: "keiner" };
+
+  // Erst die Herkunft klären, dann erst entschlüsseln. Ein Schlüssel
+  // falscher Herkunft soll gar nicht erst in den Zwischenspeicher geraten.
+  let geprueft = false;
+
+  const absenderId = typeof row.sender_id === "string" ? row.sender_id : null;
+  const unterschrift =
+    typeof row.signature === "string" && row.signature.length > 0
+      ? row.signature
+      : null;
+
+  // Beide fehlen: Altbestand von vor Migration 0013. Nur EINES fehlt: Das
+  // kann kein Altbestand sein, denn die Bedingung
+  // conversation_keys_herkunft_paarweise lässt das gar nicht zu. Also
+  // wurde daran gedreht — und dann ist Ablehnen die einzige richtige
+  // Antwort. Auf Wahrheitswerte statt auf null zu prüfen wäre hier ein
+  // Fehler: Eine leere Zeichenkette ist nicht null, aber falsy, und diese
+  // Zeile liefe dann als „Altbestand" durch.
+  if ((absenderId === null) !== (unterschrift === null)) {
+    return {
+      status: "abgelehnt",
+      grund: "Dem Schlüssel fehlt entweder der Absender oder die Unterschrift.",
+    };
+  }
+
+  if (absenderId && unterschrift) {
+    const erlaubt = await berechtigteAbsender(conversationId);
+    if (!erlaubt || !erlaubt.has(absenderId)) {
+      return {
+        status: "abgelehnt",
+        grund:
+          "Der Schlüssel wurde von jemandem abgelegt, der nicht zu dieser Unterhaltung gehört.",
+      };
+    }
+
+    const { data: absender } = await supabase
+      .from("user_keys")
+      .select("signing_public_key")
+      .eq("user_id", absenderId)
+      .maybeSingle();
+
+    if (!absender) {
+      // Der Absender hat seine Schlüssel erneuert oder gelöscht (0008
+      // erlaubt das ausdrücklich). Kein Angriff, aber auch kein Beleg.
+      geprueft = false;
+    } else {
+      try {
+        const pub = await importSigningPublicKey(
+          absender.signing_public_key as string,
+        );
+        geprueft = await crypto.subtle.verify(
+          { name: "ECDSA", hash: "SHA-256" },
+          pub,
+          fromBase64(unterschrift),
+          ENC.encode(
+            schluesselKlartext({
+              conversationId,
+              senderId: absenderId,
+              empfaengerId: row.user_id as string,
+              ephemeralPublicKey: row.ephemeral_public_key as string,
+              iv: row.iv as string,
+              data: row.data as string,
+            }),
+          ),
+        );
+      } catch {
+        geprueft = false;
+      }
+
+      if (!geprueft) {
+        return {
+          status: "abgelehnt",
+          grund: "Die Unterschrift unter dem Schlüssel stimmt nicht.",
+        };
+      }
+    }
+  }
 
   try {
     const ephemeral = await importExchangePublicKey(row.ephemeral_public_key);
@@ -279,21 +435,26 @@ export async function unterhaltungsschluessel(
       false,
       ["encrypt", "decrypt"],
     );
-    zwischenspeicher.set(conversationId, key);
-    return key;
+    zwischenspeicher.set(conversationId, { key, geprueft });
+    return { status: "offen", key, geprueft };
   } catch {
-    return null;
+    return { status: "keiner" };
   }
 }
 
 /**
  * Erzeugt einen Unterhaltungsschlüssel und legt ihn für jeden Teilnehmer
- * verschlüsselt ab.
+ * verschlüsselt und unterschrieben ab.
  */
 export async function unterhaltungsschluesselAnlegen(
   conversationId: string,
+  absenderId: string,
   teilnehmer: { userId: string; exchangePublicKey: string }[],
 ): Promise<void> {
+  if (!offen) {
+    throw new Error("Der Schlüsselbund ist gesperrt.");
+  }
+
   const supabase = createClient();
   const roh = crypto.getRandomValues(new Uint8Array(new ArrayBuffer(32)));
 
@@ -311,13 +472,33 @@ export async function unterhaltungsschluesselAnlegen(
       ["encrypt", "decrypt"],
     );
     const versiegelt = await seal(gemeinsam, roh as Uint8Array<ArrayBuffer>);
+    const ephemeralPublicKey = await exportPublicKey(einmal.publicKey);
+
+    const signature = toBase64(
+      await crypto.subtle.sign(
+        { name: "ECDSA", hash: "SHA-256" },
+        offen.signing.privateKey,
+        ENC.encode(
+          schluesselKlartext({
+            conversationId,
+            senderId: absenderId,
+            empfaengerId: person.userId,
+            ephemeralPublicKey,
+            iv: versiegelt.iv,
+            data: versiegelt.data,
+          }),
+        ),
+      ),
+    );
 
     eintraege.push({
       conversation_id: conversationId,
       user_id: person.userId,
-      ephemeral_public_key: await exportPublicKey(einmal.publicKey),
+      sender_id: absenderId,
+      ephemeral_public_key: ephemeralPublicKey,
       iv: versiegelt.iv,
       data: versiegelt.data,
+      signature,
     });
   }
 
@@ -333,8 +514,9 @@ export async function nachrichtVerschluesseln(
   conversationId: string,
   text: string,
 ): Promise<{ iv: string; data: string; signature: string } | null> {
-  const key = await unterhaltungsschluessel(conversationId);
-  if (!key || !offen) return null;
+  const ergebnis = await unterhaltungsschluessel(conversationId);
+  if (ergebnis.status !== "offen" || !offen) return null;
+  const key = ergebnis.key;
 
   const bytes = ENC.encode(text);
   const versiegelt = await seal(
@@ -365,8 +547,9 @@ export async function nachrichtEntschluesseln(
   nachricht: { iv: string; data: string; signature: string },
   absenderSigningKey: string | null,
 ): Promise<EntschluesselteNachricht | null> {
-  const key = await unterhaltungsschluessel(conversationId);
-  if (!key) return null;
+  const ergebnis = await unterhaltungsschluessel(conversationId);
+  if (ergebnis.status !== "offen") return null;
+  const key = ergebnis.key;
 
   let text: string;
   try {

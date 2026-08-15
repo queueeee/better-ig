@@ -40,14 +40,27 @@ export function SchreibenKnopf({ targetId, targetHasKeys }: Props) {
       );
       if (error || !conversationId) throw error ?? new Error("kein Ergebnis");
 
+      const meineId = (await supabase.auth.getClaims()).data?.claims?.sub;
+      if (!meineId) throw new Error("nicht angemeldet");
+
       // Existiert schon ein Schlüssel, war die Unterhaltung nicht neu.
       const vorhanden = await unterhaltungsschluessel(conversationId as string);
 
-      if (!vorhanden) {
+      // Ein Schlüssel falscher Herkunft wird nicht stillschweigend durch
+      // einen neuen ersetzt. Das ginge ohnehin nicht — conversation_keys
+      // kennt kein Update — und würde vor allem den Angriff verbergen,
+      // statt ihn zu zeigen.
+      if (vorhanden.status === "abgelehnt") {
+        setFehler(vorhanden.grund);
+        setBusy(false);
+        return;
+      }
+
+      if (vorhanden.status === "keiner") {
         const { data: keys } = await supabase
           .from("user_keys")
           .select("user_id, exchange_public_key")
-          .in("user_id", [targetId, (await supabase.auth.getClaims()).data?.claims?.sub]);
+          .in("user_id", [targetId, meineId]);
 
         const teilnehmer = (keys ?? []).map((row) => ({
           userId: row.user_id as string,
@@ -62,6 +75,7 @@ export function SchreibenKnopf({ targetId, targetHasKeys }: Props) {
 
         await unterhaltungsschluesselAnlegen(
           conversationId as string,
+          meineId,
           teilnehmer,
         );
       }
