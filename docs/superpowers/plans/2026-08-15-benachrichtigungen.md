@@ -2214,7 +2214,7 @@ export default async function BenachrichtigungenPage() {
 
                 {gruppe.typ === "kommentar" && gruppe.kommentarText ? (
                   <p className="mt-1 truncate text-[0.9rem] text-muted">
-                    „{gruppe.kommentarText}"
+                    „{gruppe.kommentarText}“
                   </p>
                 ) : null}
 
