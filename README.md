@@ -97,7 +97,7 @@ Anwendungscode: Wer ein Like setzt, darf die Benachrichtigung des Empfängers
 nicht selbst schreiben dürfen.
 
 Die Zahl an der Glocke zählt Ereignisse, die Liste zeigt Gruppen. Fünf Likes
-auf dasselbe Bild ergeben also „5" oben und eine Zeile unten. Anders ginge es
+auf dasselbe Bild ergeben also „5“ oben und eine Zeile unten. Anders ginge es
 nicht, ohne bei jedem Ereignis den Server zu fragen.
 
 Direktnachrichten zählen mit, stehen aber nicht in der Liste — ihr Inhalt ist

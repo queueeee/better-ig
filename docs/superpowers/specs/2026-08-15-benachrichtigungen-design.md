@@ -485,7 +485,7 @@ Anpassung im Browser.
 1. Migration `0010` schreiben, im SQL-Editor anwenden, Trigger dort direkt prüfen
 2. `lib/benachrichtigungen.ts` samt Gruppierung
 3. `app/glocke.tsx` und die Erweiterung der Kopfzeile
-4. Die sechs handgebauten Kopfzeilen durch die schmale Variante ersetzen
+4. Die fünf handgebauten Kopfzeilen durch die schmale Variante ersetzen
 5. `app/benachrichtigungen/page.tsx` und das Markieren als gelesen
 6. `unterhaltung_gelesen` in `/nachrichten/[id]` einhängen
 7. `supabase/testnutzer.sql` und README nachziehen
